@@ -63,6 +63,7 @@ func InitOptionMap() {
 	common.OptionMap["MihomoBinarySource"] = common.MihomoBinarySource
 	common.OptionMap["NodeTestDefaultURL"] = common.NodeTestDefaultURL
 	common.OptionMap["NodeTestDefaultTimeoutMS"] = strconv.Itoa(common.NodeTestDefaultTimeoutMS)
+	common.OptionMap["RuntimeAutoStartEnabled"] = strconv.FormatBool(common.RuntimeAutoStartEnabled)
 	common.OptionMap["ClashAllowLAN"] = strconv.FormatBool(common.ClashAllowLAN)
 	common.OptionMap["ClashExternalController"] = common.ClashExternalController
 	common.OptionMap["ClashMode"] = common.ClashMode
@@ -168,6 +169,8 @@ func updateOptionMapLocked(key string, value string) {
 			common.TurnstileCheckEnabled = boolValue
 		case "RegisterEnabled":
 			common.RegisterEnabled = boolValue
+		case "RuntimeAutoStartEnabled":
+			common.RuntimeAutoStartEnabled = boolValue
 		}
 	}
 	switch key {

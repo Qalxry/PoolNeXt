@@ -24,6 +24,69 @@ import (
 
 const runtimeProcessHelperEnv = "POOLNEXT_RUNTIME_PROCESS_HELPER"
 
+func TestAutoStartRuntimeSkipsWhenDisabled(t *testing.T) {
+	resetRuntimeRegistryForTest()
+	original := common.RuntimeAutoStartEnabled
+	common.RuntimeAutoStartEnabled = false
+	t.Cleanup(func() {
+		common.RuntimeAutoStartEnabled = original
+		resetRuntimeRegistryForTest()
+	})
+
+	if err := AutoStartRuntime(context.Background()); err != nil {
+		t.Fatalf("disabled auto start returned an error: %v", err)
+	}
+	if runtimeRegistry.currentProcess() != nil {
+		t.Fatal("disabled auto start created a managed process")
+	}
+}
+
+func TestAutoStartRuntimeReportsConfigurationFailure(t *testing.T) {
+	setupServiceTestDB(t)
+	resetRuntimeRegistryForTest()
+
+	originalAutoStart := common.RuntimeAutoStartEnabled
+	originalKernelType := common.KernelType
+	originalBinaryPath := common.MihomoBinaryPath
+	common.RuntimeAutoStartEnabled = true
+	common.KernelType = KernelTypeMihomo
+	common.MihomoBinaryPath = ""
+	t.Cleanup(func() {
+		common.RuntimeAutoStartEnabled = originalAutoStart
+		common.KernelType = originalKernelType
+		common.MihomoBinaryPath = originalBinaryPath
+		resetRuntimeRegistryForTest()
+	})
+
+	err := AutoStartRuntime(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "请先在系统设置中完成 Mihomo 二进制安装") {
+		t.Fatalf("expected missing binary error, got %v", err)
+	}
+	if runtimeRegistry.currentProcess() != nil {
+		t.Fatal("failed auto start left a managed process behind")
+	}
+}
+
+func TestGetRuntimeStatusIncludesAutoStartSetting(t *testing.T) {
+	setupServiceTestDB(t)
+	resetRuntimeRegistryForTest()
+
+	original := common.RuntimeAutoStartEnabled
+	common.RuntimeAutoStartEnabled = true
+	t.Cleanup(func() {
+		common.RuntimeAutoStartEnabled = original
+		resetRuntimeRegistryForTest()
+	})
+
+	status, err := GetRuntimeStatus(context.Background())
+	if err != nil {
+		t.Fatalf("get runtime status: %v", err)
+	}
+	if !status.AutoStartEnabled {
+		t.Fatal("runtime status did not expose the enabled auto start setting")
+	}
+}
+
 func TestStartRuntimeRejectsOccupiedListenerPort(t *testing.T) {
 	setupServiceTestDB(t)
 	resetRuntimeRegistryForTest()

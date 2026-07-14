@@ -227,13 +227,26 @@ export function RuntimePage() {
         />
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 lg:grid-cols-5">
         <AppCard title="进程状态" description="当前 Mihomo 进程是否正在运行。">
           <p className="text-sm font-semibold text-[var(--foreground-primary)]">
             {status.running ? '运行中' : '已停止'}
           </p>
           <p className="mt-2 text-xs text-[var(--foreground-secondary)]">
             {status.instance.status}
+          </p>
+        </AppCard>
+        <AppCard
+          title="自动启动"
+          description="PoolNeXt 服务启动时是否自动拉起当前代理池。"
+        >
+          <p className="text-sm font-semibold text-[var(--foreground-primary)]">
+            {status.auto_start_enabled ? '已开启' : '已关闭'}
+          </p>
+          <p className="mt-2 text-xs text-[var(--foreground-secondary)]">
+            {status.instance.last_action === 'auto_start'
+              ? status.instance.last_error || '最近自动启动成功'
+              : '可在设置 / Clash 中修改'}
           </p>
         </AppCard>
         <AppCard

@@ -42,13 +42,14 @@ type RuntimeLogList struct {
 }
 
 type RuntimeStatus struct {
-	Instance      *model.KernelInstance           `json:"instance"`
-	Running       bool                            `json:"running"`
-	APIHealthy    bool                            `json:"api_healthy"`
-	APIVersion    string                          `json:"api_version,omitempty"`
-	ProfileCount  int                             `json:"profile_count"`
-	ListenerCount int                             `json:"listener_count"`
-	Listeners     []runtimeconfig.RuntimeListener `json:"listeners"`
+	Instance         *model.KernelInstance           `json:"instance"`
+	Running          bool                            `json:"running"`
+	AutoStartEnabled bool                            `json:"auto_start_enabled"`
+	APIHealthy       bool                            `json:"api_healthy"`
+	APIVersion       string                          `json:"api_version,omitempty"`
+	ProfileCount     int                             `json:"profile_count"`
+	ListenerCount    int                             `json:"listener_count"`
+	Listeners        []runtimeconfig.RuntimeListener `json:"listeners"`
 }
 
 type runtimeOptionSnapshot struct {
@@ -58,6 +59,7 @@ type runtimeOptionSnapshot struct {
 	ControllerAddress string
 	ControllerSecret  string
 	Mode              string
+	AutoStartEnabled  bool
 }
 
 type runtimeProcessRegistry struct {
@@ -103,6 +105,25 @@ var saveRuntimeInstance = func(instance *model.KernelInstance) error {
 var runtimeDataRoot = "data"
 
 func StartRuntime(ctx context.Context) (*RuntimeStatus, error) {
+	return startRuntime(ctx, false, "start")
+}
+
+func AutoStartRuntime(ctx context.Context) error {
+	options := snapshotRuntimeOptions()
+	if !options.AutoStartEnabled {
+		return nil
+	}
+
+	status, err := startRuntime(ctx, true, "auto_start")
+	if err != nil {
+		_ = AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelError, fmt.Sprintf("Mihomo 自动启动失败: %v", err))
+		return err
+	}
+	_ = AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelInfo, fmt.Sprintf("Mihomo 自动启动完成，监听 %d 个入口。", status.ListenerCount))
+	return nil
+}
+
+func startRuntime(ctx context.Context, allowAlreadyRunning bool, action string) (*RuntimeStatus, error) {
 	runtimeRegistry.operationMu.Lock()
 	defer runtimeRegistry.operationMu.Unlock()
 
@@ -119,6 +140,9 @@ func StartRuntime(ctx context.Context) (*RuntimeStatus, error) {
 
 	if process := runtimeRegistry.currentProcess(); process != nil {
 		if _, exited := process.waitResultIfDone(); !exited {
+			if allowAlreadyRunning {
+				return GetRuntimeStatus(ctx)
+			}
 			return nil, fmt.Errorf("Mihomo 已在运行中")
 		}
 		runtimeRegistry.detachProcess(process)
@@ -134,13 +158,13 @@ func StartRuntime(ctx context.Context) (*RuntimeStatus, error) {
 
 	rendered, workDir, configPath, err := buildFinalRuntimeConfig(options, true)
 	if err != nil {
-		return nil, recordRuntimeFailure(instance, "start", err, nil)
+		return nil, recordRuntimeFailure(instance, action, err, nil)
 	}
 	if err := writeRuntimeConfig(configPath, []byte(rendered.Content)); err != nil {
-		return nil, recordRuntimeFailure(instance, "start", fmt.Errorf("写入运行配置失败: %w", err), nil)
+		return nil, recordRuntimeFailure(instance, action, fmt.Errorf("写入运行配置失败: %w", err), nil)
 	}
 	if err := ensureRuntimeListenersAvailable(rendered.Listeners); err != nil {
-		return nil, recordRuntimeFailure(instance, "start", err, nil)
+		return nil, recordRuntimeFailure(instance, action, err, nil)
 	}
 
 	now := time.Now()
@@ -151,7 +175,7 @@ func StartRuntime(ctx context.Context) (*RuntimeStatus, error) {
 	instance.ActiveConfigChecksum = rendered.Checksum
 	instance.ActiveProfileCount = rendered.ProfileCount
 	instance.ActiveListenerCount = rendered.ListenerCount
-	instance.LastAction = "start"
+	instance.LastAction = action
 	instance.LastError = ""
 	instance.LastStartedAt = &now
 	instance.Status = model.KernelInstanceStatusStarting
@@ -164,7 +188,7 @@ func StartRuntime(ctx context.Context) (*RuntimeStatus, error) {
 	cmd, err := startMihomoProcess(options.BinaryPath, workDir, configPath, stdoutWriter, stderrWriter)
 	if err != nil {
 		startErr := fmt.Errorf("启动 Mihomo 失败: %w", err)
-		return nil, recordRuntimeFailure(instance, "start", startErr, nil)
+		return nil, recordRuntimeFailure(instance, action, startErr, nil)
 	}
 	pid := cmd.Process.Pid
 	instance.PID = &pid
@@ -378,10 +402,11 @@ func GetRuntimeStatus(ctx context.Context) (*RuntimeStatus, error) {
 	}
 
 	status := &RuntimeStatus{
-		Instance:   instance,
-		Running:    process != nil,
-		APIHealthy: apiHealthy,
-		APIVersion: apiVersion,
+		Instance:         instance,
+		Running:          process != nil,
+		AutoStartEnabled: options.AutoStartEnabled,
+		APIHealthy:       apiHealthy,
+		APIVersion:       apiVersion,
 	}
 	if renderErr == nil {
 		status.ProfileCount = rendered.ProfileCount
@@ -502,6 +527,7 @@ func snapshotRuntimeOptions() runtimeOptionSnapshot {
 		ControllerAddress: address,
 		ControllerSecret:  strings.TrimSpace(common.ClashSecret),
 		Mode:              mode,
+		AutoStartEnabled:  common.RuntimeAutoStartEnabled,
 	}
 }
 

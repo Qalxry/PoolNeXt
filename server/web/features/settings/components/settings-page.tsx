@@ -63,6 +63,7 @@ const defaultSystemFields = {
   MihomoBinaryPath: '',
   MihomoBinaryVersion: '',
   MihomoBinarySource: '',
+  RuntimeAutoStartEnabled: false,
   ClashAllowLAN: false,
   ClashExternalController: '127.0.0.1:19090',
   ClashMode: 'rule',
@@ -290,6 +291,10 @@ export function SettingsPage() {
       MihomoBinaryPath: optionMap.MihomoBinaryPath ?? '',
       MihomoBinaryVersion: optionMap.MihomoBinaryVersion ?? '',
       MihomoBinarySource: optionMap.MihomoBinarySource ?? '',
+      RuntimeAutoStartEnabled: toBoolean(
+        optionMap.RuntimeAutoStartEnabled,
+        false,
+      ),
       ClashAllowLAN: toBoolean(optionMap.ClashAllowLAN, false),
       ClashExternalController:
         optionMap.ClashExternalController ?? '127.0.0.1:19090',
@@ -657,6 +662,10 @@ export function SettingsPage() {
         includeNonEmptyOptionEntries(
           [
             ['KernelType', systemFields.KernelType],
+            [
+              'RuntimeAutoStartEnabled',
+              String(systemFields.RuntimeAutoStartEnabled),
+            ],
             ['ClashAllowLAN', String(systemFields.ClashAllowLAN)],
             [
               'ClashExternalController',
@@ -1276,6 +1285,17 @@ export function SettingsPage() {
                   placeholder="输入新密钥，留空保持当前值"
                 />
               </ResourceField>
+              <ToggleField
+                label="服务启动时自动运行代理池"
+                description="开启后，PoolNeXt 启动完成会自动拉起当前加入运行配置的代理池；失败不会阻塞管理页面。"
+                checked={systemFields.RuntimeAutoStartEnabled}
+                onChange={(checked) =>
+                  setSystemFields((previous) => ({
+                    ...previous,
+                    RuntimeAutoStartEnabled: checked,
+                  }))
+                }
+              />
               <ToggleField
                 label="allow-lan"
                 description="开启后允许局域网设备访问代理监听端口。"

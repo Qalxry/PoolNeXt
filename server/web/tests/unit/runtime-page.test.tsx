@@ -23,6 +23,7 @@ const runtimeStatus = {
     updated_at: '2026-07-14T00:00:00Z',
   },
   running: true,
+  auto_start_enabled: true,
   api_healthy: true,
   api_version: 'v1.19.24',
   profile_count: 1,
@@ -88,6 +89,7 @@ describe('RuntimePage', () => {
       screen.queryByText(/controller-secret-value/),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/node-password-value/)).not.toBeInTheDocument();
+    expect(screen.getByText('已开启')).toBeInTheDocument();
 
     view.unmount();
   });

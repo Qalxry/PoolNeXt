@@ -31,6 +31,7 @@ export interface RuntimeListenerItem {
 export interface RuntimeStatus {
   instance: KernelInstanceItem;
   running: boolean;
+  auto_start_enabled: boolean;
   api_healthy: boolean;
   api_version?: string;
   profile_count: number;

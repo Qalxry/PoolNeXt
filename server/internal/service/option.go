@@ -129,6 +129,10 @@ func UpdateEditableOption(option model.Option) error {
 		if timeout > 60000 {
 			return fmt.Errorf("NodeTestDefaultTimeoutMS cannot exceed 60000")
 		}
+	case "RuntimeAutoStartEnabled":
+		if option.Value != "true" && option.Value != "false" {
+			return fmt.Errorf("RuntimeAutoStartEnabled must be true or false")
+		}
 	case "ClashAllowLAN":
 		if option.Value != "true" && option.Value != "false" {
 			return fmt.Errorf("ClashAllowLAN must be true or false")

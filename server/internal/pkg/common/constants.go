@@ -28,6 +28,7 @@ var MihomoBinaryVersion = ""
 var MihomoBinarySource = ""
 var NodeTestDefaultURL = DefaultNodeTestURL
 var NodeTestDefaultTimeoutMS = DefaultNodeTestTimeoutMS
+var RuntimeAutoStartEnabled = false
 var ClashAllowLAN = false
 var ClashExternalController = DefaultClashExternalController
 var ClashMode = DefaultClashMode

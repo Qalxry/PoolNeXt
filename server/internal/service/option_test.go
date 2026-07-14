@@ -148,6 +148,44 @@ func TestUpdateEditableOptionRejectsInvalidNodeTestDefaultTimeout(t *testing.T) 
 	}
 }
 
+func TestUpdateEditableOptionAppliesRuntimeAutoStart(t *testing.T) {
+	setupServiceTestDB(t)
+	original := common.RuntimeAutoStartEnabled
+	t.Cleanup(func() {
+		common.RuntimeAutoStartEnabled = original
+	})
+
+	if err := UpdateEditableOption(model.Option{
+		Key:   "RuntimeAutoStartEnabled",
+		Value: "true",
+	}); err != nil {
+		t.Fatalf("enable runtime auto start: %v", err)
+	}
+	if !common.RuntimeAutoStartEnabled {
+		t.Fatal("expected RuntimeAutoStartEnabled to be true")
+	}
+
+	var stored model.Option
+	if err := model.DB.First(&stored, "key = ?", "RuntimeAutoStartEnabled").Error; err != nil {
+		t.Fatalf("load persisted runtime auto start option: %v", err)
+	}
+	if stored.Value != "true" {
+		t.Fatalf("unexpected persisted runtime auto start value: %q", stored.Value)
+	}
+}
+
+func TestUpdateEditableOptionRejectsInvalidRuntimeAutoStart(t *testing.T) {
+	setupServiceTestDB(t)
+
+	err := UpdateEditableOption(model.Option{
+		Key:   "RuntimeAutoStartEnabled",
+		Value: "sometimes",
+	})
+	if err == nil {
+		t.Fatal("expected invalid runtime auto start value to fail")
+	}
+}
+
 func TestUpdateEditableOptionAppliesClashRuntimeSettings(t *testing.T) {
 	setupServiceTestDB(t)
 

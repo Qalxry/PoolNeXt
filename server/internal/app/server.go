@@ -155,6 +155,14 @@ func RunServer(assetFS fs.FS, buildDir string, indexPage []byte, zashboardDir st
 	httpServer := newHTTPServer(address, engine, requestBaseContext)
 	signalContext, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignals()
+	runtimeContext, cancelRuntime := context.WithCancel(signalContext)
+	autoStartDone := make(chan struct{})
+	go func() {
+		defer close(autoStartDone)
+		if startErr := service.AutoStartRuntime(runtimeContext); startErr != nil {
+			slog.Warn("automatic Mihomo startup failed; web service remains available", "error", startErr)
+		}
+	}()
 
 	slog.Info(
 		"server config",
@@ -176,8 +184,23 @@ func RunServer(assetFS fs.FS, buildDir string, indexPage []byte, zashboardDir st
 		"idle_timeout", httpServer.IdleTimeout,
 	)
 	slog.Info("server listening", "address", address)
-	if err = serveHTTP(signalContext, httpServer, httpConfig.ShutdownTimeout); err != nil {
-		slog.Error("server stopped with error", "error", err)
+	serveErr := serveHTTP(signalContext, httpServer, httpConfig.ShutdownTimeout)
+	cancelRuntime()
+	<-autoStartDone
+
+	runtimeShutdownContext, cancelRuntimeShutdown := context.WithTimeout(context.Background(), httpConfig.ShutdownTimeout)
+	status, statusErr := service.GetRuntimeStatus(runtimeShutdownContext)
+	if statusErr != nil {
+		slog.Warn("read Mihomo runtime status during shutdown failed", "error", statusErr)
+	} else if status.Running {
+		if _, stopErr := service.StopRuntime(runtimeShutdownContext); stopErr != nil {
+			slog.Warn("stop managed Mihomo runtime during shutdown failed", "error", stopErr)
+		}
+	}
+	cancelRuntimeShutdown()
+
+	if serveErr != nil {
+		slog.Error("server stopped with error", "error", serveErr)
 		return
 	}
 	slog.Info("server stopped")
