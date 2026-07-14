@@ -1,6 +1,10 @@
 import { apiRequest } from '@/lib/api/client';
 
-import type { AppLogList, LogClassification, LogLevel } from '@/features/logs/types';
+import type {
+  AppLogList,
+  LogClassification,
+  LogLevel,
+} from '@/features/logs/types';
 
 type GetLogsParams = {
   classification?: LogClassification | 'all';
@@ -8,7 +12,11 @@ type GetLogsParams = {
   limit?: number;
 };
 
-export function getLogs({ classification = 'all', afterId = 0, limit = 100 }: GetLogsParams = {}) {
+export function getLogs({
+  classification = 'all',
+  afterId = 0,
+  limit = 100,
+}: GetLogsParams = {}) {
   const searchParams = new URLSearchParams({
     limit: String(limit),
   });
@@ -24,7 +32,11 @@ export function getLogs({ classification = 'all', afterId = 0, limit = 100 }: Ge
   return apiRequest<AppLogList>(`/log/?${searchParams.toString()}`);
 }
 
-export function pushLog(classification: LogClassification, level: LogLevel, message: string) {
+export function pushLog(
+  classification: LogClassification,
+  level: LogLevel,
+  message: string,
+) {
   return apiRequest<void>('/log/', {
     method: 'POST',
     body: JSON.stringify({

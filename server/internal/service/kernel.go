@@ -4,16 +4,17 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"poolx/internal/model"
 	"poolx/internal/pkg/common"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -25,6 +26,18 @@ const (
 	MihomoBinarySourceExisting = "existing"
 	MihomoBinarySourceUpload   = "upload"
 	MihomoBinarySourceDownload = "download"
+
+	KernelModeExternalImmutable = "external_immutable"
+	KernelModeManaged           = "managed"
+	KernelModeUnknown           = "unknown"
+)
+
+var (
+	ErrExternalImmutableKernel     = errors.New("external immutable Mihomo binary cannot be modified")
+	ErrKernelOwnershipUnknown      = errors.New("Mihomo binary ownership is unknown")
+	ErrKernelProtectionUnavailable = errors.New("Mihomo binary protection state is unavailable")
+	ErrUnsafeKernelPath            = errors.New("unsafe Mihomo binary path")
+	ErrKernelPathChanged           = errors.New("Mihomo binary path changed during verification")
 )
 
 var kernelHTTPClient = &http.Client{
@@ -33,8 +46,16 @@ var kernelHTTPClient = &http.Client{
 
 var execCommandContext = exec.CommandContext
 
+var kernelStateMu sync.Mutex
+
+var beforeKernelReplaceForTest func()
+
+var beforeKernelRenameForTest func()
+
 type InstalledKernelBinary struct {
 	KernelType      string    `json:"kernel_type"`
+	Mode            string    `json:"mode"`
+	Immutable       bool      `json:"immutable"`
 	InstallPath     string    `json:"install_path"`
 	BinarySource    string    `json:"binary_source"`
 	DetectedVersion string    `json:"detected_version"`
@@ -44,28 +65,54 @@ type InstalledKernelBinary struct {
 }
 
 func InspectMihomoBinary(ctx context.Context, installPath string) (*InstalledKernelBinary, error) {
+	kernelStateMu.Lock()
+	defer kernelStateMu.Unlock()
+	return inspectMihomoBinaryLocked(ctx, installPath)
+}
+
+func inspectMihomoBinaryLocked(ctx context.Context, installPath string) (*InstalledKernelBinary, error) {
 	resolvedPath, err := resolveExecutableInstallPath(installPath, false)
 	if err != nil {
 		return nil, err
 	}
-	if _, err = os.Stat(resolvedPath); err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("未找到 Mihomo 二进制文件: %s", resolvedPath)
-		}
+	before, err := captureKernelFileIdentity(resolvedPath)
+	if err != nil {
 		return nil, fmt.Errorf("检查 Mihomo 二进制文件失败: %v", err)
 	}
+	if !before.Exists {
+		return nil, fmt.Errorf("未找到 Mihomo 二进制文件: %s", resolvedPath)
+	}
 
-	detectedVersion, err := detectMihomoBinaryVersion(ctx, resolvedPath)
+	detectedVersion, err := detectMihomoBinaryVersion(ctx, before.CanonicalPath)
 	if err != nil {
 		return nil, err
 	}
+	after, err := captureKernelFileIdentity(resolvedPath)
+	if err != nil {
+		return nil, fmt.Errorf("复核 Mihomo 二进制文件失败: %v", err)
+	}
+	if !sameKernelFileIdentity(before, after) {
+		return nil, ErrKernelPathChanged
+	}
 
-	return persistInstalledMihomoBinary(resolvedPath, filepath.Base(resolvedPath), MihomoBinarySourceExisting, detectedVersion, "")
+	return persistInstalledMihomoBinary(after, filepath.Base(resolvedPath), MihomoBinarySourceExisting, detectedVersion, "")
 }
 
 func InstallUploadedMihomoBinary(ctx context.Context, fileName string, installPath string, reader io.Reader) (*InstalledKernelBinary, error) {
+	kernelStateMu.Lock()
+	defer kernelStateMu.Unlock()
+	return installUploadedMihomoBinaryLocked(ctx, fileName, installPath, reader)
+}
+
+func installUploadedMihomoBinaryLocked(ctx context.Context, fileName string, installPath string, reader io.Reader) (*InstalledKernelBinary, error) {
 	resolvedPath, err := resolveExecutableInstallPath(installPath, true)
 	if err != nil {
+		return nil, err
+	}
+	if err = ensureManagedMihomoMutationAllowedLocked("upload", resolvedPath); err != nil {
+		return nil, err
+	}
+	if err = ensureKernelTargetParent(filepath.Dir(resolvedPath)); err != nil {
 		return nil, err
 	}
 	tempPath, err := persistExecutableTempFile(filepath.Dir(resolvedPath), "poolx-mihomo-upload-", fileName, reader)
@@ -76,8 +123,20 @@ func InstallUploadedMihomoBinary(ctx context.Context, fileName string, installPa
 }
 
 func DownloadAndInstallMihomoBinary(ctx context.Context, installPath string) (*InstalledKernelBinary, error) {
+	kernelStateMu.Lock()
+	defer kernelStateMu.Unlock()
+	return downloadAndInstallMihomoBinaryLocked(ctx, installPath)
+}
+
+func downloadAndInstallMihomoBinaryLocked(ctx context.Context, installPath string) (*InstalledKernelBinary, error) {
 	resolvedPath, err := resolveExecutableInstallPath(installPath, true)
 	if err != nil {
+		return nil, err
+	}
+	if err = ensureManagedMihomoMutationAllowedLocked("download", resolvedPath); err != nil {
+		return nil, err
+	}
+	if err = ensureKernelTargetParent(filepath.Dir(resolvedPath)); err != nil {
 		return nil, err
 	}
 	release, err := fetchLatestMihomoRelease(ctx)
@@ -94,7 +153,7 @@ func DownloadAndInstallMihomoBinary(ctx context.Context, installPath string) (*I
 		return nil, fmt.Errorf("创建 Mihomo 下载请求失败: %v", err)
 	}
 	req.Header.Set("Accept", "application/octet-stream")
-	req.Header.Set("User-Agent", "PoolX-Server")
+	req.Header.Set("User-Agent", "PoolNeXt-Server")
 
 	resp, err := kernelHTTPClient.Do(req)
 	if err != nil {
@@ -130,7 +189,7 @@ func fetchLatestMihomoRelease(ctx context.Context) (*githubReleaseResponse, erro
 		return nil, fmt.Errorf("创建 Mihomo 版本查询请求失败: %v", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "PoolX-Server")
+	req.Header.Set("User-Agent", "PoolNeXt-Server")
 
 	resp, err := kernelHTTPClient.Do(req)
 	if err != nil {
@@ -217,10 +276,32 @@ func preferredMihomoArchKeywords() []string {
 }
 
 func installPreparedMihomoBinary(ctx context.Context, tempPath string, installPath string, fileName string, source string, releaseTag string) (*InstalledKernelBinary, error) {
-	detectedVersion, err := detectMihomoBinaryVersion(ctx, tempPath)
+	if err := ensureManagedMihomoMutationAllowedLocked("install", installPath); err != nil {
+		_ = os.Remove(tempPath)
+		return nil, err
+	}
+
+	preparedBefore, err := captureKernelFileIdentity(tempPath)
+	if err != nil {
+		_ = os.Remove(tempPath)
+		return nil, fmt.Errorf("检查待安装 Mihomo 二进制失败: %v", err)
+	}
+	if !preparedBefore.Exists {
+		return nil, fmt.Errorf("待安装 Mihomo 二进制消失: %s", tempPath)
+	}
+	detectedVersion, err := detectMihomoBinaryVersion(ctx, preparedBefore.CanonicalPath)
 	if err != nil {
 		_ = os.Remove(tempPath)
 		return nil, err
+	}
+	preparedAfter, err := captureKernelFileIdentity(tempPath)
+	if err != nil {
+		_ = os.Remove(tempPath)
+		return nil, fmt.Errorf("复核待安装 Mihomo 二进制失败: %v", err)
+	}
+	if !sameKernelFileIdentity(preparedBefore, preparedAfter) {
+		_ = os.Remove(tempPath)
+		return nil, ErrKernelPathChanged
 	}
 
 	if strings.TrimSpace(releaseTag) != "" && !mihomoVersionMatchesRelease(detectedVersion, releaseTag) {
@@ -228,16 +309,23 @@ func installPreparedMihomoBinary(ctx context.Context, tempPath string, installPa
 		return nil, fmt.Errorf("Mihomo 版本校验失败：release=%s，binary=%s", strings.TrimSpace(releaseTag), strings.TrimSpace(detectedVersion))
 	}
 
-	if err = os.MkdirAll(filepath.Dir(installPath), 0o755); err != nil {
+	if err = ensureKernelTargetParent(filepath.Dir(installPath)); err != nil {
 		_ = os.Remove(tempPath)
-		return nil, fmt.Errorf("创建 Mihomo 目标目录失败: %v", err)
+		return nil, err
 	}
-	if err = replaceExecutableFile(tempPath, installPath); err != nil {
+	if err = replaceExecutableFileLocked(tempPath, installPath, &preparedAfter); err != nil {
 		_ = os.Remove(tempPath)
 		return nil, err
 	}
 
-	return persistInstalledMihomoBinary(installPath, fileName, source, detectedVersion, releaseTag)
+	installedIdentity, err := captureKernelFileIdentity(installPath)
+	if err != nil {
+		return nil, fmt.Errorf("复核已安装 Mihomo 二进制失败: %v", err)
+	}
+	if !installedIdentity.Exists {
+		return nil, fmt.Errorf("已安装 Mihomo 二进制消失: %s", installPath)
+	}
+	return persistInstalledMihomoBinary(installedIdentity, fileName, source, detectedVersion, releaseTag)
 }
 
 func resolveExecutableInstallPath(installPath string, allowDefault bool) (string, error) {
@@ -287,13 +375,19 @@ func persistExecutableTempFile(tempDir string, patternPrefix string, fileName st
 		_ = os.Remove(tempPath)
 		return "", fmt.Errorf("写入临时二进制文件失败: %v", err)
 	}
+	if err = tempFile.Chmod(0o755); err != nil && runtime.GOOS != "windows" {
+		_ = tempFile.Close()
+		_ = os.Remove(tempPath)
+		return "", fmt.Errorf("设置临时二进制文件权限失败: %v", err)
+	}
+	if err = tempFile.Sync(); err != nil {
+		_ = tempFile.Close()
+		_ = os.Remove(tempPath)
+		return "", fmt.Errorf("同步临时二进制文件失败: %v", err)
+	}
 	if err = tempFile.Close(); err != nil {
 		_ = os.Remove(tempPath)
 		return "", fmt.Errorf("关闭临时二进制文件失败: %v", err)
-	}
-	if err = os.Chmod(tempPath, 0o755); err != nil && runtime.GOOS != "windows" {
-		_ = os.Remove(tempPath)
-		return "", fmt.Errorf("设置临时二进制文件权限失败: %v", err)
 	}
 	return tempPath, nil
 }
@@ -333,29 +427,53 @@ func detectMihomoBinaryVersion(ctx context.Context, filePath string) (string, er
 	return "", fmt.Errorf("检查 Mihomo 二进制版本失败: %v", lastErr)
 }
 
-func persistInstalledMihomoBinary(installPath string, fileName string, source string, detectedVersion string, releaseTag string) (*InstalledKernelBinary, error) {
-	if err := model.UpdateOption("KernelType", KernelTypeMihomo); err != nil {
-		return nil, err
+func persistInstalledMihomoBinary(identity kernelFileIdentity, fileName string, source string, detectedVersion string, releaseTag string) (*InstalledKernelBinary, error) {
+	mode := mihomoKernelModeForSource(source)
+	if mode == KernelModeUnknown {
+		return nil, fmt.Errorf("%w: source=%q", ErrKernelOwnershipUnknown, strings.TrimSpace(source))
 	}
-	if err := model.UpdateOption("MihomoBinaryPath", installPath); err != nil {
-		return nil, err
+	if !identity.Exists {
+		return nil, fmt.Errorf("cannot persist missing Mihomo binary identity: %s", identity.RegisteredPath)
 	}
-	if err := model.UpdateOption("MihomoBinaryVersion", detectedVersion); err != nil {
-		return nil, err
+	normalizedSource := strings.ToLower(strings.TrimSpace(source))
+	options := map[string]string{
+		"KernelType":          KernelTypeMihomo,
+		"MihomoBinaryPath":    identity.RegisteredPath,
+		"MihomoBinaryVersion": detectedVersion,
+		"MihomoBinarySource":  normalizedSource,
 	}
-	if err := model.UpdateOption("MihomoBinarySource", source); err != nil {
-		return nil, err
+	if err := persistKernelState(newKernelIdentityRecord(identity, mode, normalizedSource), options); err != nil {
+		return nil, fmt.Errorf("持久化 Mihomo 内核状态失败: %w", err)
 	}
+	updateMihomoOptionSnapshot(identity.RegisteredPath, detectedVersion, normalizedSource)
 
 	return &InstalledKernelBinary{
 		KernelType:      KernelTypeMihomo,
-		InstallPath:     installPath,
-		BinarySource:    source,
+		Mode:            mode,
+		Immutable:       mode == KernelModeExternalImmutable,
+		InstallPath:     identity.RegisteredPath,
+		BinarySource:    normalizedSource,
 		DetectedVersion: detectedVersion,
 		FileName:        strings.TrimSpace(fileName),
 		ReleaseTag:      strings.TrimSpace(releaseTag),
 		InstalledAt:     time.Now(),
 	}, nil
+}
+
+func updateMihomoOptionSnapshot(installPath string, detectedVersion string, source string) {
+	common.OptionMapRWMutex.Lock()
+	defer common.OptionMapRWMutex.Unlock()
+	if common.OptionMap == nil {
+		common.OptionMap = make(map[string]string)
+	}
+	common.KernelType = KernelTypeMihomo
+	common.MihomoBinaryPath = installPath
+	common.MihomoBinaryVersion = detectedVersion
+	common.MihomoBinarySource = source
+	common.OptionMap["KernelType"] = KernelTypeMihomo
+	common.OptionMap["MihomoBinaryPath"] = installPath
+	common.OptionMap["MihomoBinaryVersion"] = detectedVersion
+	common.OptionMap["MihomoBinarySource"] = source
 }
 
 func mihomoVersionMatchesRelease(version string, releaseTag string) bool {
@@ -368,16 +486,224 @@ func mihomoVersionMatchesRelease(version string, releaseTag string) bool {
 }
 
 func replaceExecutableFile(tempPath string, targetPath string) error {
-	if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("清理现有 Mihomo 二进制失败: %v", err)
+	kernelStateMu.Lock()
+	defer kernelStateMu.Unlock()
+	return replaceExecutableFileLocked(tempPath, targetPath, nil)
+}
+
+func replaceExecutableFileLocked(tempPath string, targetPath string, expectedPrepared *kernelFileIdentity) error {
+	preparedIdentity, err := captureKernelFileIdentity(tempPath)
+	if err != nil {
+		return fmt.Errorf("检查待安装 Mihomo 二进制失败: %w", err)
 	}
-	if err := os.Rename(tempPath, targetPath); err != nil {
-		return fmt.Errorf("安装 Mihomo 二进制失败: %v", err)
+	if !preparedIdentity.Exists {
+		return fmt.Errorf("待安装 Mihomo 二进制消失: %s", tempPath)
 	}
-	if err := os.Chmod(targetPath, 0o755); err != nil && runtime.GOOS != "windows" {
-		return fmt.Errorf("设置 Mihomo 二进制权限失败: %v", err)
+	if expectedPrepared != nil && !sameKernelFileIdentity(*expectedPrepared, preparedIdentity) {
+		return ErrKernelPathChanged
+	}
+	if err := ensureManagedMihomoMutationAllowedLocked("replace", targetPath); err != nil {
+		return err
+	}
+	if beforeKernelReplaceForTest != nil {
+		beforeKernelReplaceForTest()
+	}
+	if beforeKernelRenameForTest != nil {
+		beforeKernelRenameForTest()
+	}
+	expectedParent, err := captureKernelDirectoryIdentity(filepath.Dir(targetPath))
+	if err != nil {
+		return err
+	}
+	expectedTarget, err := authorizeManagedMihomoMutationLocked("replace-final", targetPath)
+	if err != nil {
+		return err
+	}
+	finalPreparedIdentity, err := captureKernelFileIdentity(tempPath)
+	if err != nil {
+		return fmt.Errorf("最终复核待安装 Mihomo 二进制失败: %w", err)
+	}
+	if !sameKernelFileIdentity(preparedIdentity, finalPreparedIdentity) {
+		return ErrKernelPathChanged
+	}
+	if err := secureReplaceExecutableFile(tempPath, targetPath, finalPreparedIdentity, expectedParent, expectedTarget); err != nil {
+		return err
 	}
 	return nil
+}
+
+func mihomoKernelModeForSource(source string) string {
+	switch strings.ToLower(strings.TrimSpace(source)) {
+	case MihomoBinarySourceExisting:
+		return KernelModeExternalImmutable
+	case MihomoBinarySourceUpload, MihomoBinarySourceDownload:
+		return KernelModeManaged
+	default:
+		return KernelModeUnknown
+	}
+}
+
+func ensureManagedMihomoMutationAllowed(operation string, targetPath string) error {
+	kernelStateMu.Lock()
+	defer kernelStateMu.Unlock()
+	return ensureManagedMihomoMutationAllowedLocked(operation, targetPath)
+}
+
+func ensureManagedMihomoMutationAllowedLocked(operation string, targetPath string) error {
+	_, err := authorizeManagedMihomoMutationLocked(operation, targetPath)
+	return err
+}
+
+func authorizeManagedMihomoMutationLocked(operation string, targetPath string) (kernelFileIdentity, error) {
+	targetIdentity, err := captureKernelFileIdentity(targetPath)
+	if err != nil {
+		return kernelFileIdentity{}, fmt.Errorf("验证 Mihomo 目标路径失败: %w", err)
+	}
+	records, err := loadKernelIdentityRecords()
+	if err != nil {
+		return kernelFileIdentity{}, fmt.Errorf("%w: %v", ErrKernelProtectionUnavailable, err)
+	}
+
+	managedPathClaimed := false
+	for _, record := range records {
+		if record.KernelType != KernelTypeMihomo || record.Mode != KernelModeExternalImmutable {
+			continue
+		}
+		pathMatch := kernelRecordPathMatches(record, targetIdentity)
+		objectMatch := kernelRecordObjectMatches(record, targetIdentity)
+		if pathMatch || objectMatch {
+			return kernelFileIdentity{}, fmt.Errorf("%w: operation=%s path=%s", ErrExternalImmutableKernel, strings.TrimSpace(operation), record.RegisteredPath)
+		}
+	}
+	for _, record := range records {
+		if record.KernelType != KernelTypeMihomo || record.Mode != KernelModeManaged {
+			continue
+		}
+		pathMatch := kernelRecordPathMatches(record, targetIdentity)
+		managedPathClaimed = managedPathClaimed || pathMatch
+		if kernelRecordOwnsManagedTarget(record, targetIdentity) {
+			return targetIdentity, nil
+		}
+	}
+	if managedPathClaimed && targetIdentity.Exists {
+		return kernelFileIdentity{}, fmt.Errorf("%w: operation=%s path=%s", ErrKernelOwnershipUnknown, strings.TrimSpace(operation), targetIdentity.RegisteredPath)
+	}
+
+	common.OptionMapRWMutex.RLock()
+	currentPath := strings.TrimSpace(common.MihomoBinaryPath)
+	currentSource := strings.TrimSpace(common.MihomoBinarySource)
+	common.OptionMapRWMutex.RUnlock()
+	if currentPath != "" {
+		currentIdentity, identityErr := captureKernelFileIdentity(currentPath)
+		if identityErr != nil {
+			return kernelFileIdentity{}, fmt.Errorf("%w: validate legacy Mihomo identity: %v", ErrKernelProtectionUnavailable, identityErr)
+		}
+		if kernelFileIdentitiesReferToSameTarget(currentIdentity, targetIdentity) {
+			mode := mihomoKernelModeForSource(currentSource)
+			if mode == KernelModeUnknown {
+				return kernelFileIdentity{}, fmt.Errorf("%w: operation=%s path=%s source=%q", ErrKernelOwnershipUnknown, strings.TrimSpace(operation), currentIdentity.RegisteredPath, currentSource)
+			}
+			if err := persistKernelIdentityOnly(newKernelIdentityRecord(currentIdentity, mode, currentSource)); err != nil {
+				return kernelFileIdentity{}, fmt.Errorf("%w: persist legacy Mihomo identity: %v", ErrKernelProtectionUnavailable, err)
+			}
+			if mode == KernelModeExternalImmutable {
+				return kernelFileIdentity{}, fmt.Errorf("%w: operation=%s path=%s", ErrExternalImmutableKernel, strings.TrimSpace(operation), currentIdentity.RegisteredPath)
+			}
+			return targetIdentity, nil
+		}
+	}
+	if targetIdentity.Exists {
+		return kernelFileIdentity{}, fmt.Errorf("%w: operation=%s path=%s", ErrKernelOwnershipUnknown, strings.TrimSpace(operation), targetIdentity.RegisteredPath)
+	}
+	return targetIdentity, nil
+}
+
+func kernelFileIdentitiesReferToSameTarget(left kernelFileIdentity, right kernelFileIdentity) bool {
+	if pathEqual(left.RegisteredPath, right.RegisteredPath) ||
+		pathEqual(left.RegisteredPath, right.CanonicalPath) ||
+		pathEqual(left.CanonicalPath, right.RegisteredPath) ||
+		pathEqual(left.CanonicalPath, right.CanonicalPath) {
+		return true
+	}
+	if !left.Exists || !right.Exists {
+		return false
+	}
+	if left.DeviceID != 0 && left.Inode != 0 && right.DeviceID != 0 && right.Inode != 0 {
+		return left.DeviceID == right.DeviceID && left.Inode == right.Inode
+	}
+	return left.SHA256 != "" &&
+		left.SHA256 == right.SHA256 &&
+		left.Size == right.Size &&
+		left.FileMode == right.FileMode &&
+		left.ModTimeUnixNano == right.ModTimeUnixNano
+}
+
+func kernelPathsReferToSameFile(leftPath string, rightPath string) (bool, error) {
+	leftAbsolute, err := filepath.Abs(strings.TrimSpace(leftPath))
+	if err != nil {
+		return false, err
+	}
+	rightAbsolute, err := filepath.Abs(strings.TrimSpace(rightPath))
+	if err != nil {
+		return false, err
+	}
+
+	leftAbsolute = filepath.Clean(leftAbsolute)
+	rightAbsolute = filepath.Clean(rightAbsolute)
+	if pathEqual(leftAbsolute, rightAbsolute) {
+		return true, nil
+	}
+
+	leftCanonical, err := canonicalKernelPath(leftAbsolute)
+	if err != nil {
+		return false, err
+	}
+	rightCanonical, err := canonicalKernelPath(rightAbsolute)
+	if err != nil {
+		return false, err
+	}
+	if pathEqual(leftCanonical, rightCanonical) {
+		return true, nil
+	}
+
+	leftInfo, leftErr := os.Stat(leftAbsolute)
+	rightInfo, rightErr := os.Stat(rightAbsolute)
+	if leftErr == nil && rightErr == nil {
+		return os.SameFile(leftInfo, rightInfo), nil
+	}
+	if leftErr != nil && !os.IsNotExist(leftErr) {
+		return false, leftErr
+	}
+	if rightErr != nil && !os.IsNotExist(rightErr) {
+		return false, rightErr
+	}
+	return false, nil
+}
+
+func canonicalKernelPath(filePath string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(filePath)
+	if err == nil {
+		return filepath.Clean(resolved), nil
+	}
+	if !os.IsNotExist(err) {
+		return "", err
+	}
+
+	resolvedParent, parentErr := filepath.EvalSymlinks(filepath.Dir(filePath))
+	if parentErr == nil {
+		return filepath.Clean(filepath.Join(resolvedParent, filepath.Base(filePath))), nil
+	}
+	if os.IsNotExist(parentErr) {
+		return filepath.Clean(filePath), nil
+	}
+	return "", parentErr
+}
+
+func pathEqual(leftPath string, rightPath string) bool {
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(leftPath, rightPath)
+	}
+	return leftPath == rightPath
 }
 
 func defaultContext(ctx context.Context) context.Context {

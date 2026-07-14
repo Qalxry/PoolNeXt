@@ -98,7 +98,7 @@ const setAlert = (
 
   const contentDiv = document.createElement('div')
   contentDiv.className = 'break-all whitespace-pre-wrap'
-  contentDiv.innerHTML = t(content, params)
+  contentDiv.textContent = t(content, params)
 
   const closeButton = document.createElement('button')
   closeButton.className = 'absolute top-0 right-0 btn btn-xs btn-circle btn-ghost'
@@ -119,7 +119,7 @@ const setAlert = (
 
   progressContainer.appendChild(progressBar)
 
-  alert.innerHTML = ''
+  alert.replaceChildren()
   alert.appendChild(contentDiv)
   alert.appendChild(closeButton)
   alert.appendChild(progressContainer)

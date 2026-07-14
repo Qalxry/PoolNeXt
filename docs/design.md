@@ -1,21 +1,21 @@
-# Proxy Kernel Control Plane 设计基线
+# PoolNeXt Proxy Pool Control Plane 设计基线
 
-本文档定义当前项目在“基于 `PoolX` 演进业务产品”阶段的有效产品定位、系统边界、核心能力与架构约束。
+本文档定义 PoolNeXt 在“从已停止维护的 `Rain-kl/PoolX` fork 演进为独立产品”阶段的有效产品定位、系统边界、核心能力与架构约束。实施顺序与进度以 [`goals/goal-000-poolnext-refactor.md`](../goals/goal-000-poolnext-refactor.md) 为唯一权威入口。
 
-当前前提是：项目不再以“纯模板工程维护”为唯一目标，而是以模板工程为基础，持续交付代理池控制端业务。后续开发默认围绕 Proxy Kernel Control Plane 展开，同时保留模板提供的通用基础设施能力。
+当前前提是：项目不再以“纯模板工程维护”为目标，而是以既有 Go/Next.js 基础设施为资产，持续交付高密度、健康感知、可验证的单机 IP 代理池控制端。
 
 如果新增需求超出本文档范围，必须先更新本文档，再进入实现。
 
 ## 1. 产品定位
 
-当前项目定位为面向代理池场景的单实例 Web 控制台，首期以 Mihomo 为运行内核，为用户提供节点导入、节点测试、节点池管理、工作台配置、运行控制与状态查看能力。
+PoolNeXt 定位为面向代理池场景的单主机 Web 控制面：一个 PoolNeXt 服务管理一个 Mihomo 进程，由该进程承载多个 HTTP/SOCKS/Mixed 监听入口，为用户提供节点导入、健康探测、代理池管理、运行控制、结构化可观测性和高密度运维界面。
 
 当前阶段的定位原则：
 
-* 以 `PoolX` 的用户、鉴权、上传、设置、日志和升级能力作为产品底座
+* 复用 fork 中可验证的用户、鉴权、上传、设置、导入解析和 Go 分层能力
 * 以“统一控制平面”而非“前端直连内核”作为核心交互模式
-* 以 Mihomo MVP 闭环为当前首要交付目标，同时为 sing-box / Xray 保留扩展抽象
-* 以后台管理产品的结构清晰、可维护、可扩展为默认工程目标
+* 以 Mihomo v1.19.24 闭环为当前唯一数据面目标，暂停 sing-box / Xray 实现
+* 以高信息密度、低资源占用、明确故障状态和可恢复运维为默认工程目标
 
 ## 2. 范围边界
 
@@ -34,6 +34,8 @@
 * 工作台配置，包括监听入口、节点集合、策略、测试 URL、间隔、模板保存与片段预览
 * 运行配置渲染、片段快照、片段合并、校验和比较、启动、停止、热重载、运行状态、自动刷新与日志
 * 内核能力发现、能力协商与按能力降级的前端体验
+* 自动启动、崩溃恢复、节点健康隔离、连接建立阶段故障转移与端口就绪验证
+* 有界结构化事件、日志保留预算、错误聚合和按 operation/runtime session 追踪
 
 当前明确不纳入 MVP：
 
@@ -44,12 +46,16 @@
 * 订阅源定时同步（周期性自动刷新仍不支持）
 * 对外暴露内核私有控制 API
 * 云端分布式节点编排、Agent 集群或边缘分发体系
+* sing-box / Xray 运行实现；只保留不妨碍 Mihomo 主线的抽象边界
 
 当前明确不做：
 
 * 把不同内核的私有配置格式直接暴露为前端主模型
 * 用户直接编辑唯一运行中配置文件并绕过数据库
 * 通过拼接 shell 的方式执行内核控制命令
+* 修改、覆盖、升级、删除、移动或改变外部 Mihomo 二进制的权限
+* 把 zashboard Vue 组件并入 Next.js，或向浏览器开放完整 Mihomo 写接口
+* 对已经发送应用数据的任意 HTTP/TCP 请求进行透明重放
 
 ## 3. 技术基线
 
@@ -78,24 +84,26 @@
 ## 4. 整体架构
 
 ```text
-Proxy Kernel Control Plane
+PoolNeXt Proxy Pool Control Plane
 ├── Server
-│   ├── Admin API
-│   ├── Auth / Mail / File / Security / Settings / Logs / Upgrade
-│   ├── Source Import / Node Pool / Workspace / Runtime Control
-│   └── Static Web Host
-└── Web Admin
-    ├── Public Pages
-    ├── Dashboard
-    ├── Source Import / Node Pool / Workspace / Runtime
-    └── Settings / About
+│   ├── Admin API / Auth / Import / Settings
+│   ├── RuntimeManager / Health Scheduler / Observability
+│   ├── Database desired state / DATA_DIR snapshots
+│   ├── Restricted Mihomo controller proxy
+│   └── Next.js + isolated zashboard static host
+├── Mihomo (one process, multiple listeners)
+└── Web
+    ├── Next.js formal operations UI
+    └── Restricted zashboard advanced diagnostics
 ```
 
 职责划分：
 
-* Server：提供管理端 API、数据库访问、认证、上传、日志、升级、配置渲染与运行控制能力
-* Web Admin：提供统一管理端界面、配置入口、运行视图与反馈体验
-* Kernel Adapter：屏蔽不同内核在渲染、启动、重载、状态读取上的实现差异
+* Server：提供管理端 API、数据库访问、认证、导入、配置渲染、生命周期、健康与可观测性能力
+* Next.js：正式业务与运维 UI，不直接读取或写入 Mihomo controller
+* RuntimeManager：串行拥有 Mihomo 进程及 desired/observed state 对账
+* Mihomo：负责代理协议、监听、组策略、数据面主动健康检查和连接建立阶段的重选
+* zashboard：独立、受限的高级诊断 UI，仅通过服务端方法+路径允许列表访问 controller
 
 ## 5. 当前工程组织
 
@@ -103,7 +111,8 @@ Proxy Kernel Control Plane
 
 ```text
 server/
-├── cmd/server/
+├── main.go
+├── frontend_assets*.go
 ├── internal/app/
 ├── internal/handler/
 ├── internal/service/
@@ -116,7 +125,7 @@ server/
 
 当前约束：
 
-* `cmd/server/` 作为服务启动入口
+* `main.go` 是唯一服务启动入口；开发、发布和容器统一遵守 `embedassets` 静态资源契约
 * `internal/handler/` 负责接口层
 * `internal/service/` 负责业务逻辑编排
 * `internal/model/` 负责数据模型与迁移
@@ -206,8 +215,36 @@ server/
 * Secret 等敏感配置不得在日志或接口响应中明文回显
 * 执行进程时必须使用参数数组，禁止拼接 shell
 * 上传内容、渲染内容和运行目录必须受白名单与权限控制
+* 外部内核模式下只允许读取元数据、执行只读版本检查和作为子进程运行；维护/升级 API 必须拒绝该路径
+* zashboard 只允许经审计的只读 controller 路由及必要的诊断 WebSocket，所有写路由默认拒绝
+* Session Secret 为空、示例值或弱值时拒绝生产启动；首次管理员凭据不得固定写入源码或镜像
 
-## 7. 核心对象
+## 7. 架构决策记录（ADR）
+
+以下决策自 2026-07-14 起为 Goal 000 的强制约束。变更必须先修改本节、记录替代决策，再进入代码实现。
+
+| ADR | 状态 | 决策 | 主要理由与后果 |
+|---|---|---|---|
+| ADR-001 | Accepted | 单主机、单 PoolNeXt、单 Mihomo 进程、多监听入口 | 降低进程、端口、配置和恢复复杂度；多实例与远程 Agent 不属于 Goal 000。 |
+| ADR-002 | Accepted | 数据库 desired state 是配置真相源 | UI 与 Mihomo 均不能绕过服务层直接改最终运行配置；运行文件是可重建快照。 |
+| ADR-003 | Accepted | `/opt/clash-party/resources/sidecar/mihomo` 是 external immutable dependency | 只允许 `stat`、哈希、只读版本检查和执行；禁止覆盖、升级、删除、移动、改权。破坏性测试只使用临时副本。 |
+| ADR-004 | Accepted | Mihomo-first，暂停其他内核运行实现 | 先完成可靠闭环；抽象不得牺牲 Mihomo 的配置、健康、日志与 controller 语义。 |
+| ADR-005 | Accepted | Next.js 是正式 UI，zashboard 是隔离且受限的高级诊断 UI | 不混合 React/Vue；zashboard 经服务端允许列表代理，升级、重启、配置替换、GEO/UI 更新等接口不可用。 |
+| ADR-006 | Accepted | 故障转移承诺限定在新连接和连接建立阶段 | 已发送应用数据的请求可能产生副作用，控制面不得承诺通用透明重放；应用层重试必须由调用方按幂等语义决定。 |
+
+### 7.1 外部内核不可变契约
+
+实施和验证前后必须记录目标文件的 inode、mode、uid/gid、size、mtime 与 SHA-256。任何一项变化均视为验收失败，并立即停止所有涉及该路径的测试。配置验证、生命周期、升级和故障注入必须使用 PoolNeXt `DATA_DIR` 或临时目录中的配置；需要破坏性二进制场景时，只能使用临时副本。
+
+### 7.2 Mihomo 控制边界
+
+PoolNeXt 可以使用 Mihomo 的本地 controller 完成状态、日志、流量、连接、代理组与延迟等诊断，也可以由 RuntimeManager 执行受控配置重载。浏览器不得直接持有 controller secret。服务端必须按调用者和用途拆分接口：正式 UI 使用 PoolNeXt DTO；zashboard 只获得显式允许的方法与路径，未知路径默认拒绝。
+
+### 7.3 故障转移语义
+
+Mihomo 的 fallback、url-test、load-balance 和连接建立逻辑用于新连接选择与建连失败重选。PoolNeXt 补充健康同步、隔离、最低健康节点门槛、全失联保护与端口就绪，但不截获并重放任意应用 payload。产品文案、API 与测试必须使用同一承诺边界。
+
+## 8. 核心对象
 
 当前长期保留的核心对象包括：
 
@@ -225,7 +262,9 @@ server/
 
 如后续引入能力缓存、标签、健康记录等对象，必须先确认其是否服务于当前主线。
 
-## 8. 文档维护原则
+Goal 000 允许新增并长期保留：节点探测任务、节点健康快照/事件、运行节点绑定、结构化可观测性事件和配置历史。它们必须采用有界保留策略，不能无限保存原始样本。
+
+## 9. 文档维护原则
 
 以下内容变化时，应同步更新本文档：
 
@@ -236,3 +275,4 @@ server/
 * Runtime IR / Adapter 策略变化
 * 服务端工程组织基线变化
 * 数据库迁移策略变化
+* 外部内核模式、zashboard 允许列表或故障转移承诺变化

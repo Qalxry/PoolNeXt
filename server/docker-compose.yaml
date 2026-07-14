@@ -1,35 +1,50 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     restart: unless-stopped
     environment:
       POSTGRES_DB: poolx
       POSTGRES_USER: poolx
-      POSTGRES_PASSWORD: replace-with-strong-password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD before starting Compose}
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U poolx -d poolx"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  poolx:
+  poolnext:
     build:
+      context: .
       dockerfile: Dockerfile
+      args:
+        VERSION: ${POOLNEXT_VERSION:-dev}
+        COMMIT: ${POOLNEXT_COMMIT:-local}
     restart: unless-stopped
+    init: true
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "3000:3000"
-#     开放代理监听端口
     environment:
-      SESSION_SECRET: replace-with-random-string
-      SQLITE_PATH: /data/poolx.db
-      SQL_DSN: postgres://poolx:replace-with-strong-password@postgres:5432/poolx?sslmode=disable
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET to a strong random value before starting Compose}
+      POOLNEXT_BOOTSTRAP_FILE: /data/poolnext-bootstrap.txt
+      SQLITE_PATH: /data/poolnext.db
+      SQL_DSN: postgres://poolx:${POSTGRES_PASSWORD_URLENCODED:?set the URL-encoded PostgreSQL password}@postgres:5432/poolx?sslmode=disable
       GIN_MODE: release
       LOG_LEVEL: info
-
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     volumes:
-      - ./data/poolx:/data
+      - poolnext-data:/data
+
+volumes:
+  poolnext-data:
+  postgres-data:

@@ -36,7 +36,7 @@ export function Switch({
         'disabled:cursor-not-allowed disabled:opacity-50',
         checked
           ? 'bg-[var(--brand-primary)]'
-          : 'bg-[var(--surface-elevated)] border-[var(--border-default)]',
+          : 'border-[var(--border-default)] bg-[var(--surface-elevated)]',
         className,
       )}
       {...props}

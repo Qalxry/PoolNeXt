@@ -19,7 +19,6 @@ import {
 } from '@/features/runtime/api/runtime';
 import type { RuntimeLogItem } from '@/features/runtime/types';
 import {
-  CodeBlock,
   DangerButton,
   PrimaryButton,
   SecondaryButton,
@@ -34,7 +33,9 @@ type FeedbackState = {
 };
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '运行控制请求失败，请稍后重试。';
+  return error instanceof Error
+    ? error.message
+    : '运行控制请求失败，请稍后重试。';
 }
 
 function mergeLogs(existing: RuntimeLogItem[], incoming: RuntimeLogItem[]) {
@@ -134,7 +135,10 @@ export function RuntimePage() {
 
   const status = statusQuery.data;
   const capability = capabilityQuery.data;
-  const listenerSummary = useMemo(() => status?.listeners ?? [], [status?.listeners]);
+  const listenerSummary = useMemo(
+    () => status?.listeners ?? [],
+    [status?.listeners],
+  );
 
   if (statusQuery.isLoading) {
     return <LoadingState />;
@@ -156,13 +160,23 @@ export function RuntimePage() {
         description="聚合工作台端口配置后生成最终 Mihomo 配置，并在这里执行启动、停止、热重载和日志查看。"
         action={
           <div className="flex flex-wrap gap-2">
+            <SecondaryButton
+              type="button"
+              onClick={() => setAutoRefresh((value) => !value)}
+            >
+              {autoRefresh ? '暂停刷新' : '自动刷新'}
+            </SecondaryButton>
             <PrimaryButton
               type="button"
               onClick={() => {
                 setFeedback(null);
                 startMutation.mutate();
               }}
-              disabled={startMutation.isPending || status.running || !capability?.supports_start}
+              disabled={
+                startMutation.isPending ||
+                status.running ||
+                !capability?.supports_start
+              }
             >
               {startMutation.isPending ? '启动中...' : '启动'}
             </PrimaryButton>
@@ -172,7 +186,11 @@ export function RuntimePage() {
                 setFeedback(null);
                 reloadMutation.mutate();
               }}
-              disabled={reloadMutation.isPending || !status.running || !capability?.supports_reload}
+              disabled={
+                reloadMutation.isPending ||
+                !status.running ||
+                !capability?.supports_reload
+              }
             >
               {reloadMutation.isPending ? '重载中...' : '热重载'}
             </SecondaryButton>
@@ -188,7 +206,9 @@ export function RuntimePage() {
             </DangerButton>
             <SecondaryButton
               type="button"
-              onClick={() => window.open('/zashboard/', '_blank', 'noopener,noreferrer')}
+              onClick={() =>
+                window.open('/zashboard/', '_blank', 'noopener,noreferrer')
+              }
               disabled={!status.running}
             >
               打开 Clash 控制台
@@ -197,8 +217,15 @@ export function RuntimePage() {
         }
       />
 
-      {feedback ? <InlineMessage tone={feedback.tone} message={feedback.message} /> : null}
-      {capability ? <InlineMessage tone={capability.binary_exists ? 'info' : 'danger'} message={capability.message} /> : null}
+      {feedback ? (
+        <InlineMessage tone={feedback.tone} message={feedback.message} />
+      ) : null}
+      {capability ? (
+        <InlineMessage
+          tone={capability.binary_exists ? 'info' : 'danger'}
+          message={capability.message}
+        />
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-4">
         <AppCard title="进程状态" description="当前 Mihomo 进程是否正在运行。">
@@ -209,7 +236,10 @@ export function RuntimePage() {
             {status.instance.status}
           </p>
         </AppCard>
-        <AppCard title="API 健康" description="本地 external-controller 检查结果。">
+        <AppCard
+          title="API 健康"
+          description="本地 external-controller 检查结果。"
+        >
           <p className="text-sm font-semibold text-[var(--foreground-primary)]">
             {status.api_healthy ? '正常' : '未就绪'}
           </p>
@@ -217,7 +247,10 @@ export function RuntimePage() {
             {status.api_version || status.instance.controller_address}
           </p>
         </AppCard>
-        <AppCard title="端口配置" description="当前参与最终配置聚合的工作台配置数量。">
+        <AppCard
+          title="端口配置"
+          description="当前参与最终配置聚合的工作台配置数量。"
+        >
           <p className="text-sm font-semibold text-[var(--foreground-primary)]">
             {status.profile_count}
           </p>
@@ -229,13 +262,26 @@ export function RuntimePage() {
         </AppCard>
       </div>
 
-      <AppCard title="实例详情" description="展示最近动作、PID、配置文件位置和错误摘要。">
+      <AppCard
+        title="实例详情"
+        description="展示最近动作、PID、配置文件位置和错误摘要。"
+      >
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-2 text-sm text-[var(--foreground-secondary)]">
             <p>PID：{status.instance.pid ?? '未运行'}</p>
             <p>最近动作：{status.instance.last_action || '无'}</p>
-            <p>启动时间：{status.instance.last_started_at ? formatDateTime(status.instance.last_started_at) : '未启动'}</p>
-            <p>重载时间：{status.instance.last_reloaded_at ? formatDateTime(status.instance.last_reloaded_at) : '未重载'}</p>
+            <p>
+              启动时间：
+              {status.instance.last_started_at
+                ? formatDateTime(status.instance.last_started_at)
+                : '未启动'}
+            </p>
+            <p>
+              重载时间：
+              {status.instance.last_reloaded_at
+                ? formatDateTime(status.instance.last_reloaded_at)
+                : '未重载'}
+            </p>
           </div>
           <div className="space-y-2 text-sm text-[var(--foreground-secondary)]">
             <p>运行目录：{status.instance.work_dir || '未生成'}</p>
@@ -246,9 +292,15 @@ export function RuntimePage() {
         </div>
       </AppCard>
 
-      <AppCard title="监听列表" description="每个监听入口对应一个工作台端口配置和策略组。">
+      <AppCard
+        title="监听列表"
+        description="每个监听入口对应一个工作台端口配置和策略组。"
+      >
         {listenerSummary.length === 0 ? (
-          <EmptyState title="暂无监听入口" description="请先在工作台启用至少一个端口配置。" />
+          <EmptyState
+            title="暂无监听入口"
+            description="请先在工作台启用至少一个端口配置。"
+          />
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
             {listenerSummary.map((listener) => (
@@ -261,7 +313,9 @@ export function RuntimePage() {
                 </p>
                 <div className="mt-2 space-y-1 text-sm text-[var(--foreground-secondary)]">
                   <p>协议：{listener.type}</p>
-                  <p>监听：{listener.listen}:{listener.port}</p>
+                  <p>
+                    监听：{listener.listen}:{listener.port}
+                  </p>
                   <p>工作台：{listener.profile_name}</p>
                   <p>策略组：{listener.proxy_group_name}</p>
                 </div>
@@ -271,20 +325,50 @@ export function RuntimePage() {
         )}
       </AppCard>
 
-      <AppCard title="最终配置预览" description="这里展示的是聚合多个工作台片段后生成的最终 Mihomo 配置。">
-        {!status.rendered_config_preview ? (
-          <EmptyState title="暂无最终配置" description="启用工作台端口配置后，这里会显示当前聚合结果。" />
-        ) : (
-          <CodeBlock className="max-h-[480px] overflow-auto">
-            {status.rendered_config_preview}
-          </CodeBlock>
-        )}
+      <AppCard
+        title="最终配置摘要"
+        description="仅展示非敏感元数据，控制密钥和节点凭据不会在界面中展开。"
+      >
+        <div className="grid gap-4 text-sm text-[var(--foreground-secondary)] md:grid-cols-3">
+          <div>
+            <p className="text-xs text-[var(--foreground-muted)]">活动配置</p>
+            <p className="mt-1 font-medium text-[var(--foreground-primary)]">
+              {status.instance.active_config_checksum ? '已加载' : '未加载'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--foreground-muted)]">参与工作台</p>
+            <p className="mt-1 font-medium text-[var(--foreground-primary)]">
+              {status.profile_count}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--foreground-muted)]">监听入口</p>
+            <p className="mt-1 font-medium text-[var(--foreground-primary)]">
+              {status.listener_count}
+            </p>
+          </div>
+          <div className="md:col-span-3">
+            <p className="text-xs text-[var(--foreground-muted)]">
+              活动配置校验和
+            </p>
+            <p className="mt-1 font-mono text-xs break-all text-[var(--foreground-primary)]">
+              {status.instance.active_config_checksum || '暂无'}
+            </p>
+          </div>
+        </div>
       </AppCard>
 
-      <AppCard title="运行日志" description={`当前缓存 ${logs.length} 条运行日志${lastSeq > 0 ? `，最新序号 ${lastSeq}` : ''}`}>
+      <AppCard
+        title="运行日志"
+        description={`当前缓存 ${logs.length} 条运行日志${lastSeq > 0 ? `，最新序号 ${lastSeq}` : ''}`}
+      >
         {logsQuery.isLoading ? <LoadingState /> : null}
         {logs.length === 0 ? (
-          <EmptyState title="暂无运行日志" description="启动 Mihomo 后，这里会持续展示 stdout 和 stderr 输出。" />
+          <EmptyState
+            title="暂无运行日志"
+            description="启动 Mihomo 后，这里会持续展示 stdout 和 stderr 输出。"
+          />
         ) : (
           <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-elevated)]">
             <div className="max-h-[520px] overflow-y-auto px-4 py-3">
@@ -294,7 +378,8 @@ export function RuntimePage() {
                     key={item.seq}
                     className="rounded-2xl border border-transparent px-3 py-2 font-mono text-xs leading-6 text-[var(--foreground-primary)] hover:border-[var(--border-default)] hover:bg-[var(--surface-card)]"
                   >
-                    [{formatDateTime(item.created_at)}] [{item.stream}] [{item.level}] {item.message}
+                    [{formatDateTime(item.created_at)}] [{item.stream}] [
+                    {item.level}] {item.message}
                   </div>
                 ))}
               </div>

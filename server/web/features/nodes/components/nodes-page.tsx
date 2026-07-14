@@ -17,7 +17,6 @@ import {
   deleteProxyNodes,
   getProxyNodes,
   testProxyNodes,
-  updateProxyNodeTags,
 } from '@/features/nodes/api/nodes';
 import type { ProxyNodeItem } from '@/features/nodes/types';
 import {
@@ -62,7 +61,6 @@ export function NodesPage() {
   );
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-  const [tagsInput, setTagsInput] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
@@ -129,20 +127,6 @@ export function NodesPage() {
     },
   });
 
-  const tagsMutation = useMutation({
-    mutationFn: async (nodeIds: number[]) => updateProxyNodeTags(nodeIds, tagsInput),
-    onSuccess: async (result) => {
-      setFeedback({
-        tone: 'success',
-        message: `已更新 ${result.updated} 个节点标签。`,
-      });
-      await queryClient.invalidateQueries({ queryKey: proxyNodesQueryKey });
-    },
-    onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
-    },
-  });
-
   const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data]);
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -179,10 +163,16 @@ export function NodesPage() {
         action={
           <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--foreground-secondary)]">
             <span>当前已选择 {selectedIds.length} 个节点</span>
-            <PrimaryButton type="button" onClick={() => setIsImportModalOpen(true)}>
+            <PrimaryButton
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+            >
               导入节点
             </PrimaryButton>
-            <SecondaryButton type="button" onClick={() => setAutoRefresh((value) => !value)}>
+            <SecondaryButton
+              type="button"
+              onClick={() => setAutoRefresh((value) => !value)}
+            >
               {autoRefresh ? '暂停刷新' : '自动刷新'}
             </SecondaryButton>
           </div>
@@ -199,7 +189,10 @@ export function NodesPage() {
         />
       ) : null}
 
-      <AppCard title="筛选条件" description="支持按节点名称、地址和启用状态筛选。">
+      <AppCard
+        title="筛选条件"
+        description="支持按节点名称、地址和启用状态筛选。"
+      >
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
           <ResourceField label="关键字">
             <ResourceInput
@@ -231,34 +224,6 @@ export function NodesPage() {
         </div>
       </AppCard>
 
-      {/*暂时不开放节点标签功能, 注释掉相关UI和接口调用, 后续根据需求再完善, 以下内容不要删除*/}
-      {/*<AppCard*/}
-      {/*  title="节点标签"*/}
-      {/*  description="支持为当前选择的节点批量打标签，使用逗号分隔。"*/}
-      {/*>*/}
-      {/*  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">*/}
-      {/*    <ResourceInput*/}
-      {/*      value={tagsInput}*/}
-      {/*      onChange={(event) => setTagsInput(event.target.value)}*/}
-      {/*      placeholder="例如：hk, premium, low-latency"*/}
-      {/*    />*/}
-      {/*    <PrimaryButton*/}
-      {/*      type="button"*/}
-      {/*      onClick={() => {*/}
-      {/*        if (selectedIds.length === 0) {*/}
-      {/*          setFeedback({ tone: 'danger', message: '请先选择至少一个节点。' })*/}
-      {/*          return*/}
-      {/*        }*/}
-      {/*        setFeedback(null)*/}
-      {/*        tagsMutation.mutate(selectedIds)*/}
-      {/*      }}*/}
-      {/*      disabled={tagsMutation.isPending}*/}
-      {/*    >*/}
-      {/*      {tagsMutation.isPending ? '保存中...' : '保存标签'}*/}
-      {/*    </PrimaryButton>*/}
-      {/*  </div>*/}
-      {/*</AppCard>*/}
-
       <AppCard
         title="节点列表"
         description="列表字段保留了后续工作台与运行控制会复用的标准化节点信息。"
@@ -282,7 +247,10 @@ export function NodesPage() {
               type="button"
               onClick={() => {
                 if (selectedIds.length === 0) {
-                  setFeedback({ tone: 'danger', message: '请先选择至少一个节点。' });
+                  setFeedback({
+                    tone: 'danger',
+                    message: '请先选择至少一个节点。',
+                  });
                   return;
                 }
                 setFeedback(null);
@@ -296,10 +264,17 @@ export function NodesPage() {
               type="button"
               onClick={() => {
                 if (selectedIds.length === 0) {
-                  setFeedback({ tone: 'danger', message: '请先选择至少一个节点。' });
+                  setFeedback({
+                    tone: 'danger',
+                    message: '请先选择至少一个节点。',
+                  });
                   return;
                 }
-                if (!window.confirm(`确认批量删除 ${selectedIds.length} 个节点吗？`)) {
+                if (
+                  !window.confirm(
+                    `确认批量删除 ${selectedIds.length} 个节点吗？`,
+                  )
+                ) {
                   return;
                 }
                 setFeedback(null);
@@ -320,7 +295,9 @@ export function NodesPage() {
               description={getErrorMessage(nodesQuery.error)}
             />
           ) : null}
-          {!nodesQuery.isLoading && !nodesQuery.isError && nodes.length === 0 ? (
+          {!nodesQuery.isLoading &&
+          !nodesQuery.isError &&
+          nodes.length === 0 ? (
             <EmptyState
               title="暂无节点"
               description="点击右上角“导入节点”上传 YAML 或填写订阅地址并完成导入。"
@@ -350,7 +327,8 @@ export function NodesPage() {
                             {node.name}
                           </p>
                           <p className="text-sm text-[var(--foreground-secondary)]">
-                            {node.type.toUpperCase()} · {node.server}:{node.port}
+                            {node.type.toUpperCase()} · {node.server}:
+                            {node.port}
                           </p>
                           <div className="text-xs text-[var(--foreground-secondary)]">
                             <p>来源：{node.source_config_name}</p>
@@ -388,7 +366,9 @@ export function NodesPage() {
                         <DangerButton
                           type="button"
                           onClick={() => {
-                            if (!window.confirm(`确认删除节点“${node.name}”吗？`)) {
+                            if (
+                              !window.confirm(`确认删除节点“${node.name}”吗？`)
+                            ) {
                               return;
                             }
                             setFeedback(null);
@@ -441,7 +421,9 @@ export function NodesPage() {
             });
             setSelectedIds([]);
             setPage(0);
-            await queryClient.invalidateQueries({ queryKey: proxyNodesQueryKey });
+            await queryClient.invalidateQueries({
+              queryKey: proxyNodesQueryKey,
+            });
             setIsImportModalOpen(false);
           }}
         />

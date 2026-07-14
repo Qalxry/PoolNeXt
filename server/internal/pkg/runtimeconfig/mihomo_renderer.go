@@ -47,7 +47,7 @@ func RenderMihomoConfig(input MihomoRenderInput) (*RenderResult, error) {
 
 	groupName := strings.TrimSpace(input.Profile.Name)
 	if groupName == "" {
-		groupName = "POOLX"
+		groupName = "PoolNeXt"
 	}
 
 	fragment := map[string]any{

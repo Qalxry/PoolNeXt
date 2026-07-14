@@ -20,6 +20,10 @@ type serverUpgradeRequest struct {
 	Channel string `json:"channel"`
 }
 
+const serverUpgradeWebSocketWriteTimeout = 15 * time.Second
+
+var serverUpgradeHeartbeatInterval = 15 * time.Second
+
 // GetLatestRelease godoc
 // @Summary Get latest GitHub release
 // @Tags Update
@@ -81,6 +85,14 @@ func UpgradeServer(c *gin.Context) {
 // @Tags Update
 // @Router /api/update/logs/ws [get]
 func StreamServerUpgradeLogs(c *gin.Context) {
+	if err := clearResponseWriteDeadline(c.Writer); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "无法建立升级日志流。",
+		})
+		return
+	}
+
 	websocket.Handler(func(conn *websocket.Conn) {
 		defer func() {
 			_ = conn.Close()
@@ -89,7 +101,7 @@ func StreamServerUpgradeLogs(c *gin.Context) {
 		updates, unsubscribe := service.SubscribeServerUpgradeStream()
 		defer unsubscribe()
 
-		heartbeatTicker := time.NewTicker(15 * time.Second)
+		heartbeatTicker := time.NewTicker(serverUpgradeHeartbeatInterval)
 		defer heartbeatTicker.Stop()
 
 		for {
@@ -98,11 +110,11 @@ func StreamServerUpgradeLogs(c *gin.Context) {
 				if !ok {
 					return
 				}
-				if err := websocket.JSON.Send(conn, snapshot); err != nil {
+				if err := sendServerUpgradeSnapshot(conn, snapshot); err != nil {
 					return
 				}
 			case <-heartbeatTicker.C:
-				if err := websocket.JSON.Send(conn, service.ServerUpgradeStreamSnapshot{}); err != nil {
+				if err := sendServerUpgradeSnapshot(conn, service.ServerUpgradeStreamSnapshot{}); err != nil {
 					return
 				}
 			case <-c.Request.Context().Done():
@@ -110,6 +122,17 @@ func StreamServerUpgradeLogs(c *gin.Context) {
 			}
 		}
 	}).ServeHTTP(c.Writer, c.Request)
+}
+
+func clearResponseWriteDeadline(writer http.ResponseWriter) error {
+	return http.NewResponseController(writer).SetWriteDeadline(time.Time{})
+}
+
+func sendServerUpgradeSnapshot(conn *websocket.Conn, snapshot service.ServerUpgradeStreamSnapshot) error {
+	if err := conn.SetWriteDeadline(time.Now().Add(serverUpgradeWebSocketWriteTimeout)); err != nil {
+		return err
+	}
+	return websocket.JSON.Send(conn, snapshot)
 }
 
 // UploadManualServerBinary godoc

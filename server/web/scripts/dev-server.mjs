@@ -6,7 +6,10 @@ import next from 'next';
 const port = Number.parseInt(process.env.PORT ?? '3001', 10);
 const hostname = process.env.HOSTNAME || '127.0.0.1';
 const backendBaseUrl = new URL(
-  (process.env.NEXT_DEV_BACKEND_URL || 'http://127.0.0.1:3000').replace(/\/+$/, ''),
+  (process.env.NEXT_DEV_BACKEND_URL || 'http://127.0.0.1:3000').replace(
+    /\/+$/,
+    '',
+  ),
 );
 
 const app = next({
@@ -55,11 +58,19 @@ function writeProxyError(res, error) {
 
 function proxyHttpRequest(req, res) {
   const targetUrl = new URL(req.url || '/', backendBaseUrl);
-  const requestImpl = targetUrl.protocol === 'https:' ? https.request : http.request;
-  const proxyReq = requestImpl(createProxyRequestOptions(req, targetUrl), (proxyRes) => {
-    res.writeHead(proxyRes.statusCode || 502, proxyRes.statusMessage, proxyRes.headers);
-    proxyRes.pipe(res);
-  });
+  const requestImpl =
+    targetUrl.protocol === 'https:' ? https.request : http.request;
+  const proxyReq = requestImpl(
+    createProxyRequestOptions(req, targetUrl),
+    (proxyRes) => {
+      res.writeHead(
+        proxyRes.statusCode || 502,
+        proxyRes.statusMessage,
+        proxyRes.headers,
+      );
+      proxyRes.pipe(res);
+    },
+  );
 
   proxyReq.on('error', (error) => {
     if (!res.headersSent) {
@@ -92,7 +103,8 @@ function formatUpgradeResponseHeaders(statusCode, statusMessage, headers) {
 
 function proxyWebSocketUpgrade(req, socket, head) {
   const targetUrl = new URL(req.url || '/', backendBaseUrl);
-  const requestImpl = targetUrl.protocol === 'https:' ? https.request : http.request;
+  const requestImpl =
+    targetUrl.protocol === 'https:' ? https.request : http.request;
   const proxyReq = requestImpl(createProxyRequestOptions(req, targetUrl));
 
   proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
@@ -156,6 +168,10 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 server.listen(port, hostname, () => {
-  console.log(`PoolX web dev server listening on http://${hostname}:${port}`);
-  console.log(`Proxying /api/* and websocket upgrades to ${backendBaseUrl.href}`);
+  console.log(
+    `PoolNeXt web dev server listening on http://${hostname}:${port}`,
+  );
+  console.log(
+    `Proxying /api/* and websocket upgrades to ${backendBaseUrl.href}`,
+  );
 });

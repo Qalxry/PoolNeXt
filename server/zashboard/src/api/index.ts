@@ -1,6 +1,5 @@
-import { MIHOMO, MIHOMO_CHANNEL, ROUTE_NAME } from '@/constant'
+import { MIHOMO, MIHOMO_CHANNEL } from '@/constant'
 import { showNotification } from '@/helper/notification'
-import router from '@/router'
 import { autoUpgradeCore, checkUpgradeCore } from '@/store/settings'
 import { activeBackend, activeUuid } from '@/store/setup'
 import type {

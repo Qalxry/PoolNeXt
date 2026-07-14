@@ -1,6 +1,6 @@
 # Proxy Kernel Control Plane 开发规范
 
-本文档描述当前项目在“基于 `PoolX` 演进代理池控制端”阶段的开发基线。
+本文档描述 PoolNeXt 在“从 `PoolX` fork 演进为独立代理池控制端”阶段的开发基线。
 
 当前前提是：模板底座仍然保留，但后续开发默认目标是交付 Proxy Kernel Control Plane，而不是继续把项目收敛为纯模板演示工程。
 
@@ -38,7 +38,8 @@
 
 ```text
 server/
-├── cmd/server/
+├── main.go
+├── frontend_assets*.go
 ├── internal/app/
 ├── internal/handler/
 ├── internal/service/
@@ -53,7 +54,7 @@ server/
 要求：
 
 * 新增服务端代码优先落到现有 `server/internal/*` 分层
-* `cmd/server/` 继续作为默认启动入口
+* `main.go` 是唯一服务启动入口；禁止新增绕过 `embedassets` 契约的重复 `main` 包
 * 不为了贴合概念模型而平移出一套全新的平行目录体系
 * 如确有必要，可按模块演进出 `repository/`、`dto/`，但必须有清晰收益
 * 目录调整要与模块边界、测试和文档同步完成

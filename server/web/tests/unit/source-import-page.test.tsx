@@ -119,7 +119,9 @@ describe('SourceImportPanel', () => {
       await screen.findByText('解析完成，识别到 1 个有效节点。'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/来源订阅 https:\/\/sub\.example\.com\/clash\.yaml\?\*\*\*/),
+      screen.getByText(
+        /来源订阅 https:\/\/sub\.example\.com\/clash\.yaml\?\*\*\*/,
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/secret-token/)).not.toBeInTheDocument();
   });

@@ -1,8 +1,20 @@
-PoolX
-Copyright 2022-2026 PoolX Authors
+PoolNeXt
+Copyright 2026 PoolNeXt Authors
 
-This product includes software developed by the PoolX authors and
-contributors and is licensed under the Apache License, Version 2.0.
+PoolNeXt is licensed under the Apache License, Version 2.0.
 
 You may obtain a copy of the License at:
 http://www.apache.org/licenses/LICENSE-2.0
+
+PoolNeXt is derived from PoolX:
+Copyright 2022-2026 PoolX Authors
+https://github.com/Rain-kl/PoolX
+
+PoolNeXt includes a locally integrated copy of Zashboard v2.8.0:
+https://github.com/Zephyruso/zashboard
+Upstream commit: 80a2a52d928df9838986bdef317ed0623eb026dc
+Copyright 2024 Zephyruso
+
+Zashboard is licensed under the MIT License. The copyright and permission
+notice are preserved in server/zashboard/LICENSE and must remain included in
+all copies or substantial portions of the software.

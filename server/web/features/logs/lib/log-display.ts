@@ -1,5 +1,12 @@
-import type { AppLogItem, LogClassification, LogLevel } from '@/features/logs/types';
-import { formatDateTime, formatDateTimeWithMilliseconds } from '@/lib/utils/date';
+import type {
+  AppLogItem,
+  LogClassification,
+  LogLevel,
+} from '@/features/logs/types';
+import {
+  formatDateTime,
+  formatDateTimeWithMilliseconds,
+} from '@/lib/utils/date';
 
 type ClassificationMeta = { label: string; tone: string; dot: string };
 type LevelMeta = { label: string };
@@ -54,7 +61,9 @@ export function getClassificationMeta(classification: string) {
 
   return {
     ...unknownClassificationMeta,
-    label: classification ? `${unknownClassificationMeta.label}(${classification})` : unknownClassificationMeta.label,
+    label: classification
+      ? `${unknownClassificationMeta.label}(${classification})`
+      : unknownClassificationMeta.label,
   };
 }
 
@@ -64,7 +73,9 @@ export function getLevelMeta(level: string) {
   }
 
   return {
-    label: level ? `${unknownLevelMeta.label}(${level.toUpperCase()})` : unknownLevelMeta.label,
+    label: level
+      ? `${unknownLevelMeta.label}(${level.toUpperCase()})`
+      : unknownLevelMeta.label,
   };
 }
 
@@ -78,7 +89,9 @@ export function matchesLogKeyword(item: AppLogItem, keyword: string) {
     return true;
   }
 
-  const classificationLabel = getClassificationMeta(item.classification).label.toLowerCase();
+  const classificationLabel = getClassificationMeta(
+    item.classification,
+  ).label.toLowerCase();
   const levelLabel = getLevelMeta(item.level).label.toLowerCase();
 
   return (
@@ -88,6 +101,8 @@ export function matchesLogKeyword(item: AppLogItem, keyword: string) {
     item.level.toLowerCase().includes(normalizedKeyword) ||
     levelLabel.includes(normalizedKeyword) ||
     formatDateTime(item.created_at).toLowerCase().includes(normalizedKeyword) ||
-    formatDateTimeWithMilliseconds(item.created_at).toLowerCase().includes(normalizedKeyword)
+    formatDateTimeWithMilliseconds(item.created_at)
+      .toLowerCase()
+      .includes(normalizedKeyword)
   );
 }

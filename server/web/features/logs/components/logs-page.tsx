@@ -48,7 +48,8 @@ function mergeLogs(existing: AppLogItem[], incoming: AppLogItem[]) {
 }
 
 export function LogsPage() {
-  const [classification, setClassification] = useState<ClassificationFilter>('all');
+  const [classification, setClassification] =
+    useState<ClassificationFilter>('all');
   const [search, setSearch] = useState('');
   const [logs, setLogs] = useState<AppLogItem[]>([]);
   const [isPaused, setIsPaused] = useState(false);
@@ -119,9 +120,7 @@ export function LogsPage() {
   };
 
   const handleCopy = async () => {
-    const content = filteredLogs
-      .map(formatLogLine)
-      .join('\n');
+    const content = filteredLogs.map(formatLogLine).join('\n');
 
     if (!content) {
       setFeedback('当前没有可复制的日志。');
@@ -138,14 +137,12 @@ export function LogsPage() {
       return;
     }
 
-    const content = filteredLogs
-      .map(formatLogLine)
-      .join('\n');
+    const content = filteredLogs.map(formatLogLine).join('\n');
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `poolx-logs-${Date.now()}.txt`;
+    link.download = `poolnext-logs-${Date.now()}.txt`;
     link.click();
     URL.revokeObjectURL(url);
     setFeedback('日志文件已生成。');
@@ -156,66 +153,82 @@ export function LogsPage() {
   }
 
   if (logsQuery.isError) {
-    return <ErrorState title='日志加载失败' description={getErrorMessage(logsQuery.error)} />;
+    return (
+      <ErrorState
+        title="日志加载失败"
+        description={getErrorMessage(logsQuery.error)}
+      />
+    );
   }
 
   return (
-    <div className='space-y-6'>
+    <div className="space-y-6">
       <PageHeader
-        title='系统日志'
-        description='默认展示最近 100 条。'
+        title="系统日志"
+        description="默认展示最近 100 条。"
         action={
-          <div className='flex flex-wrap gap-2'>
-            <SecondaryButton type='button' onClick={() => setIsPaused((value) => !value)}>
+          <div className="flex flex-wrap gap-2">
+            <SecondaryButton
+              type="button"
+              onClick={() => setIsPaused((value) => !value)}
+            >
               {isPaused ? '继续同步' : '暂停同步'}
             </SecondaryButton>
-            <SecondaryButton type='button' onClick={() => void handleCopy()}>
+            <SecondaryButton type="button" onClick={() => void handleCopy()}>
               复制
             </SecondaryButton>
-            <SecondaryButton type='button' onClick={handleDownload}>
+            <SecondaryButton type="button" onClick={handleDownload}>
               下载日志
             </SecondaryButton>
-            <PrimaryButton type='button' onClick={() => void handleManualRefresh()}>
+            <PrimaryButton
+              type="button"
+              onClick={() => void handleManualRefresh()}
+            >
               获取新日志
             </PrimaryButton>
           </div>
         }
       />
 
-      {feedback ? <InlineMessage tone='info' message={feedback} /> : null}
+      {feedback ? <InlineMessage tone="info" message={feedback} /> : null}
 
       <AppCard
-        title='日志筛选'
-        description='支持按分类切换、日志级别关键字搜索和增量刷新。'
+        title="日志筛选"
+        description="支持按分类切换、日志级别关键字搜索和增量刷新。"
       >
-        <div className='grid gap-4 lg:grid-cols-2'>
+        <div className="grid gap-4 lg:grid-cols-2">
           <ResourceSelect
             value={classification}
-            onChange={(event) => setClassification(event.target.value as ClassificationFilter)}
+            onChange={(event) =>
+              setClassification(event.target.value as ClassificationFilter)
+            }
           >
-            <option value='all'>全部日志</option>
-            <option value='system'>系统日志</option>
-            <option value='business'>业务日志</option>
-            <option value='security'>安全日志</option>
+            <option value="all">全部日志</option>
+            <option value="system">系统日志</option>
+            <option value="business">业务日志</option>
+            <option value="security">安全日志</option>
           </ResourceSelect>
           <ResourceInput
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder='搜索日志时间、分类、级别或消息内容'
+            placeholder="搜索日志时间、分类、级别或消息内容"
           />
         </div>
       </AppCard>
 
       <AppCard
-        title='日志流'
+        title="日志流"
         description={`当前展示 ${filteredLogs.length} 条日志${lastLogId > 0 ? `，最新日志 ID 为 ${lastLogId}` : ''}`}
       >
         {filteredLogs.length === 0 ? (
-          <EmptyState title='暂无日志' description='当前筛选条件下还没有日志数据。' />
+          <EmptyState
+            title="暂无日志"
+            description="当前筛选条件下还没有日志数据。"
+          />
         ) : (
-          <div className='overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-elevated)]'>
-            <div className='max-h-[620px] overflow-y-auto px-4 py-3'>
-              <div className='space-y-2'>
+          <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-elevated)]">
+            <div className="max-h-[620px] overflow-y-auto px-4 py-3">
+              <div className="space-y-2">
                 {filteredLogs.map((item) => {
                   const meta = getClassificationMeta(item.classification);
                   const logLine = formatLogLine(item);
@@ -223,12 +236,14 @@ export function LogsPage() {
                   return (
                     <div
                       key={item.id}
-                      className='flex gap-3 rounded-2xl border border-transparent px-3 py-2 transition hover:border-[var(--border-default)] hover:bg-[var(--surface-card)]'
+                      className="flex gap-3 rounded-2xl border border-transparent px-3 py-2 transition hover:border-[var(--border-default)] hover:bg-[var(--surface-card)]"
                     >
-                      <span className={`mt-1 h-5 w-1.5 shrink-0 rounded-full ${meta.dot}`} />
-                      <div className='min-w-0 flex-1'>
+                      <span
+                        className={`mt-1 h-5 w-1.5 shrink-0 rounded-full ${meta.dot}`}
+                      />
+                      <div className="min-w-0 flex-1">
                         <p
-                          className='overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs text-[var(--foreground-primary)]'
+                          className="overflow-hidden font-mono text-xs text-ellipsis whitespace-nowrap text-[var(--foreground-primary)]"
                           title={logLine}
                         >
                           {logLine}

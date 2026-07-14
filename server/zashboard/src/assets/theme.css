@@ -1,4 +1,4 @@
-@plugin "daisyui/theme" {
+@plugin 'daisyui/theme' {
   name: 'dark-legacy';
   --color-primary: oklch(65.69% 0.196 275.75);
   --color-primary-content: #050617;
@@ -23,7 +23,7 @@
   color-scheme: dark;
 }
 
-@plugin "daisyui/theme" {
+@plugin 'daisyui/theme' {
   name: 'light-legacy';
   --color-primary: oklch(49.12% 0.3096 275.75);
   --color-primary-content: #d4dbff;
@@ -47,8 +47,7 @@
   --noise: 0;
 }
 
-
-@plugin "daisyui/theme" {
+@plugin 'daisyui/theme' {
   name: 'light-monet';
   --color-primary: var(--primary, oklch(49.12% 0.3096 275.75));
   --color-primary-content: var(--onPrimary, #d4dbff);
@@ -72,11 +71,11 @@
   --noise: 0;
 }
 
-@plugin "daisyui/theme" {
+@plugin 'daisyui/theme' {
   name: 'dark-monet';
   --color-primary: var(--primary, oklch(65.69% 0.196 275.75));
   --color-primary-content: var(--onPrimary, #050617);
-  --color-secondary: var(--secondary,oklch(74.8% 0.26 342.55));
+  --color-secondary: var(--secondary, oklch(74.8% 0.26 342.55));
   --color-secondary-content: var(--onSecondary, #190211);
   --color-accent: var(--tertiary, oklch(74.51% 0.167 183.61));
   --color-accent-content: var(--onTertiary, #000e0c);

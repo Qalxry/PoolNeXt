@@ -14,12 +14,12 @@ export function ModulePageSkeleton({
   description,
 }: ModulePageSkeletonProps) {
   return (
-    <div className='space-y-6'>
+    <div className="space-y-6">
       <PageHeader title={title} description={description} />
 
       <FeaturePlaceholder
         title={`${title} 页面骨架`}
-        description='当前阶段先完成页面入口、统一头部和反馈组件接线，真实列表、表单与联动能力将在后续业务迁移阶段接入。'
+        description="当前阶段先完成页面入口、统一头部和反馈组件接线，真实列表、表单与联动能力将在后续业务迁移阶段接入。"
         milestones={[
           '路由入口已创建，可纳入统一导航。',
           '页面标题区、说明区与内容容器已统一。',
@@ -27,10 +27,16 @@ export function ModulePageSkeleton({
         ]}
       />
 
-      <div className='grid gap-4 xl:grid-cols-3'>
+      <div className="grid gap-4 xl:grid-cols-3">
         <LoadingState />
-        <EmptyState title='空态骨架' description='后续接入查询后，可将资源为空时的提示统一沉淀为此组件。' />
-        <ErrorState title='错误态骨架' description='后续请求失败、鉴权失效与重试提示可在此基础上扩展。' />
+        <EmptyState
+          title="空态骨架"
+          description="后续接入查询后，可将资源为空时的提示统一沉淀为此组件。"
+        />
+        <ErrorState
+          title="错误态骨架"
+          description="后续请求失败、鉴权失效与重试提示可在此基础上扩展。"
+        />
       </div>
     </div>
   );

@@ -32,17 +32,23 @@ const baseSchemaObject = z.object({
   verification_code: z.string().optional(),
 });
 
-const baseSchema = baseSchemaObject.refine((data) => data.password === data.password2, {
-  message: '两次输入的密码不一致',
-  path: ['password2'],
-});
+const baseSchema = baseSchemaObject.refine(
+  (data) => data.password === data.password2,
+  {
+    message: '两次输入的密码不一致',
+    path: ['password2'],
+  },
+);
 
 type RegisterFormValues = z.infer<typeof baseSchema>;
 
 export function RegisterForm() {
   const router = useRouter();
   const [turnstileToken, setTurnstileToken] = useState('');
-  const [message, setMessage] = useState<{ tone: 'success' | 'danger' | 'info'; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    tone: 'success' | 'danger' | 'info';
+    text: string;
+  } | null>(null);
 
   const statusQuery = useQuery({
     queryKey: ['public-status'],
@@ -94,7 +100,10 @@ export function RegisterForm() {
       router.replace('/login');
     },
     onError: (error: Error) => {
-      setMessage({ tone: 'danger', text: error.message || '注册失败，请稍后重试。' });
+      setMessage({
+        tone: 'danger',
+        text: error.message || '注册失败，请稍后重试。',
+      });
     },
   });
 
@@ -111,7 +120,10 @@ export function RegisterForm() {
       setMessage({ tone: 'success', text: '验证码发送成功，请检查邮箱。' });
     },
     onError: (error: Error) => {
-      setMessage({ tone: 'danger', text: error.message || '验证码发送失败，请稍后重试。' });
+      setMessage({
+        tone: 'danger',
+        text: error.message || '验证码发送失败，请稍后重试。',
+      });
     },
   });
 
@@ -126,30 +138,44 @@ export function RegisterForm() {
 
   return (
     <PublicAuthGuard>
-      <AppCard title='新用户注册' description='兼容现有密码注册链路，后续可继续扩展第三方注册。'>
-        <form className='space-y-4' onSubmit={handleSubmit}>
-          <AuthFormField label='用户名' hint='最长 12 位'>
-            <AuthInput placeholder='请输入用户名' {...form.register('username')} />
+      <AppCard
+        title="新用户注册"
+        description="兼容现有密码注册链路，后续可继续扩展第三方注册。"
+      >
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <AuthFormField label="用户名" hint="最长 12 位">
+            <AuthInput
+              placeholder="请输入用户名"
+              {...form.register('username')}
+            />
             {form.formState.errors.username ? (
-              <span className='text-xs text-[var(--status-danger-foreground)]'>
+              <span className="text-xs text-[var(--status-danger-foreground)]">
                 {form.formState.errors.username.message}
               </span>
             ) : null}
           </AuthFormField>
 
-          <AuthFormField label='密码' hint='最短 8 位，最长 20 位'>
-            <AuthInput type='password' placeholder='请输入密码' {...form.register('password')} />
+          <AuthFormField label="密码" hint="最短 8 位，最长 20 位">
+            <AuthInput
+              type="password"
+              placeholder="请输入密码"
+              {...form.register('password')}
+            />
             {form.formState.errors.password ? (
-              <span className='text-xs text-[var(--status-danger-foreground)]'>
+              <span className="text-xs text-[var(--status-danger-foreground)]">
                 {form.formState.errors.password.message}
               </span>
             ) : null}
           </AuthFormField>
 
-          <AuthFormField label='确认密码'>
-            <AuthInput type='password' placeholder='请再次输入密码' {...form.register('password2')} />
+          <AuthFormField label="确认密码">
+            <AuthInput
+              type="password"
+              placeholder="请再次输入密码"
+              {...form.register('password2')}
+            />
             {form.formState.errors.password2 ? (
-              <span className='text-xs text-[var(--status-danger-foreground)]'>
+              <span className="text-xs text-[var(--status-danger-foreground)]">
                 {form.formState.errors.password2.message}
               </span>
             ) : null}
@@ -157,27 +183,34 @@ export function RegisterForm() {
 
           {needsEmailVerification ? (
             <>
-              <AuthFormField label='邮箱地址'>
-                <AuthInput type='email' placeholder='请输入邮箱地址' {...form.register('email')} />
+              <AuthFormField label="邮箱地址">
+                <AuthInput
+                  type="email"
+                  placeholder="请输入邮箱地址"
+                  {...form.register('email')}
+                />
                 {form.formState.errors.email ? (
-                  <span className='text-xs text-[var(--status-danger-foreground)]'>
+                  <span className="text-xs text-[var(--status-danger-foreground)]">
                     {form.formState.errors.email.message}
                   </span>
                 ) : null}
               </AuthFormField>
 
-              <AuthFormField label='邮箱验证码'>
-                <div className='flex flex-col gap-3 sm:flex-row'>
+              <AuthFormField label="邮箱验证码">
+                <div className="flex flex-col gap-3 sm:flex-row">
                   <AuthInput
-                    placeholder='请输入验证码'
-                    className='flex-1'
+                    placeholder="请输入验证码"
+                    className="flex-1"
                     {...form.register('verification_code')}
                   />
                   <SecondaryButton
-                    type='button'
+                    type="button"
                     onClick={() => {
                       if (needsTurnstile && !turnstileToken) {
-                        setMessage({ tone: 'info', text: '请先完成人机验证。' });
+                        setMessage({
+                          tone: 'info',
+                          text: '请先完成人机验证。',
+                        });
                         return;
                       }
                       setMessage(null);
@@ -185,11 +218,13 @@ export function RegisterForm() {
                     }}
                     disabled={verificationMutation.isPending}
                   >
-                    {verificationMutation.isPending ? '发送中...' : '获取验证码'}
+                    {verificationMutation.isPending
+                      ? '发送中...'
+                      : '获取验证码'}
                   </SecondaryButton>
                 </div>
                 {form.formState.errors.verification_code ? (
-                  <span className='text-xs text-[var(--status-danger-foreground)]'>
+                  <span className="text-xs text-[var(--status-danger-foreground)]">
                     {form.formState.errors.verification_code.message}
                   </span>
                 ) : null}
@@ -206,16 +241,21 @@ export function RegisterForm() {
             />
           ) : null}
 
-          {message ? <InlineMessage tone={message.tone} message={message.text} /> : null}
+          {message ? (
+            <InlineMessage tone={message.tone} message={message.text} />
+          ) : null}
 
-          <AuthButton type='submit' disabled={registerMutation.isPending}>
+          <AuthButton type="submit" disabled={registerMutation.isPending}>
             {registerMutation.isPending ? '注册中...' : '注册'}
           </AuthButton>
         </form>
 
-        <div className='mt-6 text-sm text-[var(--foreground-secondary)]'>
+        <div className="mt-6 text-sm text-[var(--foreground-secondary)]">
           已有账户？
-          <Link href='/login' className='ml-2 text-[var(--brand-primary)] transition hover:opacity-80'>
+          <Link
+            href="/login"
+            className="ml-2 text-[var(--brand-primary)] transition hover:opacity-80"
+          >
             点击登录
           </Link>
         </div>

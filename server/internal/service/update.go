@@ -35,9 +35,11 @@ var updateHTTPClient = &http.Client{
 
 var serverUpgradeState struct {
 	sync.Mutex
-	inProgress bool
-	status     string
-	logs       []ServerUpgradeLogRecord
+	nextTaskID   uint64
+	activeTaskID uint64
+	inProgress   bool
+	status       string
+	logs         []ServerUpgradeLogRecord
 }
 
 var serverUpgradeSubscribers struct {
@@ -136,42 +138,27 @@ func GetLatestServerRelease(ctx context.Context, channel string) (*LatestServerR
 
 func ScheduleServerUpgrade(channel string) (*LatestServerRelease, error) {
 	normalizedChannel := normalizeReleaseChannel(channel)
-	serverUpgradeState.Lock()
-	if serverUpgradeState.inProgress {
-		serverUpgradeState.Unlock()
-		return nil, fmt.Errorf("服务升级正在执行中，请稍后再试")
-	}
-
-	resetServerUpgradeLogsLocked()
-	serverUpgradeState.status = "running"
-	appendServerUpgradeLogLocked("info", fmt.Sprintf("Automatic upgrade scheduled for channel: %s.", normalizedChannel.String()))
-	serverUpgradeState.Unlock()
-	broadcastServerUpgradeSnapshot()
-
-	prepared, err := prepareServerUpgrade(context.Background(), normalizedChannel)
+	taskID, err := beginServerUpgrade(fmt.Sprintf("Automatic upgrade scheduled for channel: %s.", normalizedChannel.String()))
 	if err != nil {
-		serverUpgradeState.Lock()
-		serverUpgradeState.status = "failed"
-		appendServerUpgradeLogLocked("error", err.Error())
-		serverUpgradeState.Unlock()
-		broadcastServerUpgradeSnapshot()
 		return nil, err
 	}
 
-	serverUpgradeState.Lock()
-	serverUpgradeState.inProgress = true
-	serverUpgradeState.Unlock()
-	broadcastServerUpgradeSnapshot()
+	prepared, err := prepareServerUpgrade(context.Background(), normalizedChannel, taskID)
+	if err != nil {
+		recordServerUpgradeFailure(taskID, err)
+		return nil, err
+	}
 
 	prepared.release.InProgress = true
+	dispatchDelay := serverUpgradeDispatchDelay
 
-	go func(task *preparedServerUpgrade) {
-		time.Sleep(serverUpgradeDispatchDelay)
-		if err := executeServerUpgrade(task); err != nil {
-			recordServerUpgradeFailure(err)
+	go func(id uint64, task *preparedServerUpgrade, delay time.Duration) {
+		time.Sleep(delay)
+		if err := executeServerUpgrade(id, task); err != nil {
+			recordServerUpgradeFailure(id, err)
 			slog.Error("server self-update failed", "error", err)
 		}
-	}(prepared)
+	}(taskID, prepared, dispatchDelay)
 
 	return prepared.release, nil
 }
@@ -220,6 +207,12 @@ func UploadManualServerBinary(ctx context.Context, fileName string, reader io.Re
 		return nil, fmt.Errorf("生成升级令牌失败: %v", err)
 	}
 
+	serverUpgradeState.Lock()
+	if serverUpgradeState.inProgress {
+		serverUpgradeState.Unlock()
+		_ = os.Remove(tempPath)
+		return nil, fmt.Errorf("服务升级正在执行中，请稍后再试")
+	}
 	manualServerBinaryState.Lock()
 	cleanupManualServerBinaryCandidateLocked()
 	manualServerBinaryState.candidate = &manualServerBinaryCandidate{
@@ -232,6 +225,7 @@ func UploadManualServerBinary(ctx context.Context, fileName string, reader io.Re
 		UploadedAt:      uploadedAt,
 	}
 	manualServerBinaryState.Unlock()
+	serverUpgradeState.Unlock()
 
 	info.UploadToken = uploadToken
 	return info, nil
@@ -248,44 +242,44 @@ func ConfirmManualServerUpgrade(uploadToken string) (*UploadedServerBinary, erro
 		serverUpgradeState.Unlock()
 		return nil, fmt.Errorf("服务升级正在执行中，请稍后再试")
 	}
-	serverUpgradeState.Unlock()
-
 	manualServerBinaryState.Lock()
 	candidate := manualServerBinaryState.candidate
 	if candidate == nil {
 		manualServerBinaryState.Unlock()
+		serverUpgradeState.Unlock()
 		return nil, fmt.Errorf("未找到待确认的上传升级包，请重新上传")
 	}
 	if candidate.UploadToken != uploadToken {
 		manualServerBinaryState.Unlock()
+		serverUpgradeState.Unlock()
 		return nil, fmt.Errorf("升级令牌无效或已过期，请重新上传")
 	}
-	manualServerBinaryState.candidate = nil
-	manualServerBinaryState.Unlock()
 
 	info := buildUploadedServerBinaryView(candidate.FileName, candidate.CurrentVersion, candidate.DetectedVersion, candidate.UploadedAt)
 	info.UploadToken = candidate.UploadToken
 	if !info.ReadyToUpgrade {
+		manualServerBinaryState.candidate = nil
+		manualServerBinaryState.Unlock()
+		serverUpgradeState.Unlock()
 		_ = os.Remove(candidate.TempPath)
 		return nil, fmt.Errorf("当前上传的二进制不满足升级条件")
 	}
 
-	serverUpgradeState.Lock()
-	serverUpgradeState.inProgress = true
-	resetServerUpgradeLogsLocked()
-	serverUpgradeState.status = "running"
-	appendServerUpgradeLogLocked("info", fmt.Sprintf("Manual upgrade confirmed for version: %s.", strings.TrimSpace(candidate.DetectedVersion)))
+	manualServerBinaryState.candidate = nil
+	taskID := beginServerUpgradeLocked(fmt.Sprintf("Manual upgrade confirmed for version: %s.", strings.TrimSpace(candidate.DetectedVersion)))
+	manualServerBinaryState.Unlock()
 	serverUpgradeState.Unlock()
 	broadcastServerUpgradeSnapshot()
+	dispatchDelay := serverUpgradeDispatchDelay
 
-	go func(task *manualServerBinaryCandidate) {
-		time.Sleep(serverUpgradeDispatchDelay)
-		if err := executeServerBinaryCandidateUpgrade(task, "manual"); err != nil {
-			recordServerUpgradeFailure(err)
+	go func(id uint64, task *manualServerBinaryCandidate, delay time.Duration) {
+		time.Sleep(delay)
+		if err := executeServerBinaryCandidateUpgrade(id, task, "manual"); err != nil {
+			recordServerUpgradeFailure(id, err)
 			slog.Error("server manual upgrade failed", "error", err)
 			_ = os.Remove(task.TempPath)
 		}
-	}(candidate)
+	}(taskID, candidate, dispatchDelay)
 
 	return info, nil
 }
@@ -387,7 +381,7 @@ func newGitHubReleaseRequest(ctx context.Context, url string) (*http.Request, er
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "PoolX-Server")
+	req.Header.Set("User-Agent", "PoolNeXt-Server")
 	return req, nil
 }
 
@@ -436,7 +430,7 @@ func buildLatestServerReleaseView(release *githubReleaseResponse, channel Releas
 	return view
 }
 
-func prepareServerUpgrade(ctx context.Context, channel ReleaseChannel) (*preparedServerUpgrade, error) {
+func prepareServerUpgrade(ctx context.Context, channel ReleaseChannel, taskID uint64) (*preparedServerUpgrade, error) {
 	release, err := fetchLatestRelease(ctx, channel)
 	if err != nil {
 		return nil, err
@@ -450,18 +444,26 @@ func prepareServerUpgrade(ctx context.Context, channel ReleaseChannel) (*prepare
 		return nil, fmt.Errorf("当前平台暂不支持自动升级")
 	}
 
-	assetName := serverAssetName(runtime.GOOS, runtime.GOARCH)
-	recordServerUpgradeLog("info", fmt.Sprintf("Matching release asset: %s.", assetName))
+	assetNames := []string{
+		serverAssetName(runtime.GOOS, runtime.GOARCH),
+		legacyServerAssetName(runtime.GOOS, runtime.GOARCH),
+	}
+	recordServerUpgradeLog(taskID, "info", fmt.Sprintf("Matching release asset: %s.", assetNames[0]))
 
 	var downloadURL string
-	for _, asset := range release.Assets {
-		if asset.Name == assetName {
-			downloadURL = asset.BrowserDownloadURL
+	for _, candidateName := range assetNames {
+		for _, asset := range release.Assets {
+			if asset.Name == candidateName {
+				downloadURL = asset.BrowserDownloadURL
+				break
+			}
+		}
+		if downloadURL != "" {
 			break
 		}
 	}
 	if downloadURL == "" {
-		return nil, fmt.Errorf("最新版本缺少当前平台的服务端二进制: %s", assetName)
+		return nil, fmt.Errorf("最新版本缺少当前平台的服务端二进制: %s", assetNames[0])
 	}
 
 	execPath, err := os.Executable()
@@ -471,7 +473,7 @@ func prepareServerUpgrade(ctx context.Context, channel ReleaseChannel) (*prepare
 	if err = verifyExecutableDirectoryWritable(execPath); err != nil {
 		return nil, err
 	}
-	recordServerUpgradeLog("info", "Verified current executable directory is writable.")
+	recordServerUpgradeLog(taskID, "info", "Verified current executable directory is writable.")
 
 	return &preparedServerUpgrade{
 		release:     view,
@@ -490,7 +492,7 @@ func configuredServerReleaseRepo() string {
 
 func verifyExecutableDirectoryWritable(execPath string) error {
 	dir := filepath.Dir(execPath)
-	tempFile, err := os.CreateTemp(dir, "poolx-server-upgrade-check-*")
+	tempFile, err := os.CreateTemp(dir, "poolnext-server-upgrade-check-*")
 	if err != nil {
 		return fmt.Errorf("当前服务二进制目录不可写，无法升级: %v", err)
 	}
@@ -505,8 +507,8 @@ func verifyExecutableDirectoryWritable(execPath string) error {
 	return nil
 }
 
-func executeServerUpgrade(task *preparedServerUpgrade) error {
-	recordServerUpgradeLog("info", fmt.Sprintf("Downloading automatic upgrade package for version: %s.", strings.TrimSpace(task.release.TagName)))
+func executeServerUpgrade(taskID uint64, task *preparedServerUpgrade) error {
+	recordServerUpgradeLog(taskID, "info", fmt.Sprintf("Downloading automatic upgrade package for version: %s.", strings.TrimSpace(task.release.TagName)))
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -515,7 +517,7 @@ func executeServerUpgrade(task *preparedServerUpgrade) error {
 		return err
 	}
 	req.Header.Set("Accept", "application/octet-stream")
-	req.Header.Set("User-Agent", "PoolX-Server")
+	req.Header.Set("User-Agent", "PoolNeXt-Server")
 
 	resp, err := updateHTTPClient.Do(req)
 	if err != nil {
@@ -527,27 +529,40 @@ func executeServerUpgrade(task *preparedServerUpgrade) error {
 		return fmt.Errorf("下载服务端升级包失败: %s", resp.Status)
 	}
 
-	recordServerUpgradeLog("info", "Download finished, validating binary version.")
-	candidate, err := persistDownloadedServerBinary(ctx, task.execPath, task.release.TagName, resp.Body)
+	recordServerUpgradeLog(taskID, "info", "Download finished, validating binary version.")
+	candidate, err := persistDownloadedServerBinary(ctx, taskID, task.execPath, task.release.TagName, resp.Body)
 	if err != nil {
 		return err
 	}
-	return executeServerBinaryCandidateUpgrade(candidate, "auto")
+	return executeServerBinaryCandidateUpgrade(taskID, candidate, "auto")
 }
 
-func executeServerBinaryCandidateUpgrade(task *manualServerBinaryCandidate, source string) error {
-	recordServerUpgradeLog("info", fmt.Sprintf("Validated binary version: %s -> %s.", strings.TrimSpace(task.CurrentVersion), strings.TrimSpace(task.DetectedVersion)))
-	recordServerUpgradeLog("info", "Replacing executable and preparing restart.")
+func executeServerBinaryCandidateUpgrade(taskID uint64, task *manualServerBinaryCandidate, source string) error {
+	recordServerUpgradeLog(taskID, "info", fmt.Sprintf("Validated binary version: %s -> %s.", strings.TrimSpace(task.CurrentVersion), strings.TrimSpace(task.DetectedVersion)))
+	if !markServerUpgradeRestarting(taskID) {
+		return errors.New("服务升级任务已失效")
+	}
 	if source == "manual" {
 		slog.Info("server manual self-update starting", "from", strings.TrimSpace(task.CurrentVersion), "to", strings.TrimSpace(task.DetectedVersion))
 	} else {
 		slog.Info("server self-update starting", "from", strings.TrimSpace(task.CurrentVersion), "to", strings.TrimSpace(task.DetectedVersion))
 	}
-	markServerUpgradeSucceeded()
-	return serverBinaryUpgradeExecutor(task.ExecPath, task.TempPath)
+	if err := serverBinaryUpgradeExecutor(task.ExecPath, task.TempPath); err != nil {
+		return err
+	}
+	markServerUpgradeSucceeded(taskID)
+	return nil
 }
 
 func serverAssetName(goos string, goarch string) string {
+	name := fmt.Sprintf("poolnext-server-%s-%s", goos, goarch)
+	if goos == "windows" {
+		return name + ".exe"
+	}
+	return name
+}
+
+func legacyServerAssetName(goos string, goarch string) string {
 	name := fmt.Sprintf("poolx-server-%s-%s", goos, goarch)
 	if goos == "windows" {
 		return name + ".exe"
@@ -806,7 +821,7 @@ func isManualServerUpgradeSupported(currentVersion string) bool {
 }
 
 func persistUploadedServerBinary(tempDir string, fileName string, reader io.Reader) (string, error) {
-	tempPath, err := persistExecutableTempFile(tempDir, "poolx-server-manual-upgrade-", fileName, reader)
+	tempPath, err := persistExecutableTempFile(tempDir, "poolnext-server-manual-upgrade-", fileName, reader)
 	if err != nil {
 		return "", fmt.Errorf("创建临时升级文件失败: %v", err)
 	}
@@ -821,7 +836,7 @@ func detectUploadedServerBinaryVersion(ctx context.Context, filePath string) (st
 	return version, nil
 }
 
-func persistDownloadedServerBinary(ctx context.Context, execPath string, releaseTag string, reader io.Reader) (*manualServerBinaryCandidate, error) {
+func persistDownloadedServerBinary(ctx context.Context, taskID uint64, execPath string, releaseTag string, reader io.Reader) (*manualServerBinaryCandidate, error) {
 	fileName := serverAssetName(runtime.GOOS, runtime.GOARCH)
 	tempPath, err := persistUploadedServerBinary(filepath.Dir(execPath), fileName, reader)
 	if err != nil {
@@ -833,7 +848,7 @@ func persistDownloadedServerBinary(ctx context.Context, execPath string, release
 		_ = os.Remove(tempPath)
 		return nil, err
 	}
-	recordServerUpgradeLog("info", fmt.Sprintf("Detected downloaded binary version: %s.", strings.TrimSpace(detectedVersion)))
+	recordServerUpgradeLog(taskID, "info", fmt.Sprintf("Detected downloaded binary version: %s.", strings.TrimSpace(detectedVersion)))
 
 	if normalizeVersion(detectedVersion) != normalizeVersion(releaseTag) {
 		_ = os.Remove(tempPath)
@@ -913,24 +928,70 @@ func appendServerUpgradeLogLocked(level string, message string) {
 	}
 }
 
-func recordServerUpgradeLog(level string, message string) {
+func beginServerUpgrade(message string) (uint64, error) {
 	serverUpgradeState.Lock()
+	if serverUpgradeState.inProgress {
+		serverUpgradeState.Unlock()
+		return 0, fmt.Errorf("服务升级正在执行中，请稍后再试")
+	}
+	taskID := beginServerUpgradeLocked(message)
+	serverUpgradeState.Unlock()
+	broadcastServerUpgradeSnapshot()
+	return taskID, nil
+}
+
+func beginServerUpgradeLocked(message string) uint64 {
+	serverUpgradeState.nextTaskID++
+	serverUpgradeState.activeTaskID = serverUpgradeState.nextTaskID
+	serverUpgradeState.inProgress = true
+	serverUpgradeState.status = "running"
+	resetServerUpgradeLogsLocked()
+	appendServerUpgradeLogLocked("info", message)
+	return serverUpgradeState.activeTaskID
+}
+
+func recordServerUpgradeLog(taskID uint64, level string, message string) {
+	serverUpgradeState.Lock()
+	if serverUpgradeState.activeTaskID != taskID || !serverUpgradeState.inProgress {
+		serverUpgradeState.Unlock()
+		return
+	}
 	appendServerUpgradeLogLocked(level, message)
 	serverUpgradeState.Unlock()
 	broadcastServerUpgradeSnapshot()
 }
 
-func markServerUpgradeSucceeded() {
+func markServerUpgradeRestarting(taskID uint64) bool {
 	serverUpgradeState.Lock()
+	if serverUpgradeState.activeTaskID != taskID || !serverUpgradeState.inProgress {
+		serverUpgradeState.Unlock()
+		return false
+	}
+	serverUpgradeState.status = "restarting"
+	appendServerUpgradeLogLocked("info", "Upgrade binary is ready; server restart will begin.")
+	serverUpgradeState.Unlock()
+	broadcastServerUpgradeSnapshot()
+	return true
+}
+
+func markServerUpgradeSucceeded(taskID uint64) {
+	serverUpgradeState.Lock()
+	if serverUpgradeState.activeTaskID != taskID || !serverUpgradeState.inProgress {
+		serverUpgradeState.Unlock()
+		return
+	}
 	serverUpgradeState.inProgress = false
 	serverUpgradeState.status = "succeeded"
-	appendServerUpgradeLogLocked("info", "Upgrade binary is ready; server restart will begin.")
 	serverUpgradeState.Unlock()
 	broadcastServerUpgradeSnapshot()
 }
 
-func recordServerUpgradeFailure(err error) {
+func recordServerUpgradeFailure(taskID uint64, err error) {
 	serverUpgradeState.Lock()
+	if serverUpgradeState.activeTaskID != taskID || !serverUpgradeState.inProgress {
+		serverUpgradeState.Unlock()
+		return
+	}
 	serverUpgradeState.inProgress = false
 	serverUpgradeState.status = "failed"
 	if err != nil {
@@ -949,40 +1010,38 @@ func SubscribeServerUpgradeStream() (<-chan ServerUpgradeStreamSnapshot, func())
 	listenerID := serverUpgradeSubscribers.nextID
 	listener := make(chan ServerUpgradeStreamSnapshot, 8)
 	serverUpgradeSubscribers.listeners[listenerID] = listener
-	serverUpgradeSubscribers.Unlock()
-
 	listener <- snapshotServerUpgradeStream()
+	serverUpgradeSubscribers.Unlock()
 
 	unsubscribe := func() {
 		serverUpgradeSubscribers.Lock()
 		ch, ok := serverUpgradeSubscribers.listeners[listenerID]
 		if ok {
 			delete(serverUpgradeSubscribers.listeners, listenerID)
-		}
-		serverUpgradeSubscribers.Unlock()
-		if ok {
 			close(ch)
 		}
+		serverUpgradeSubscribers.Unlock()
 	}
 
 	return listener, unsubscribe
 }
 
 func broadcastServerUpgradeSnapshot() {
+	broadcastServerUpgradeSnapshotWithHook(nil)
+}
+
+func broadcastServerUpgradeSnapshotWithHook(beforeSend func()) {
 	snapshot := snapshotServerUpgradeStream()
 
 	serverUpgradeSubscribers.Lock()
+	defer serverUpgradeSubscribers.Unlock()
 	if len(serverUpgradeSubscribers.listeners) == 0 {
-		serverUpgradeSubscribers.Unlock()
 		return
 	}
-	listeners := make([]chan ServerUpgradeStreamSnapshot, 0, len(serverUpgradeSubscribers.listeners))
-	for _, listener := range serverUpgradeSubscribers.listeners {
-		listeners = append(listeners, listener)
+	if beforeSend != nil {
+		beforeSend()
 	}
-	serverUpgradeSubscribers.Unlock()
-
-	for _, listener := range listeners {
+	for _, listener := range serverUpgradeSubscribers.listeners {
 		select {
 		case listener <- snapshot:
 		default:

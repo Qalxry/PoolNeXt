@@ -1,44 +1,67 @@
+# syntax=docker/dockerfile:1.7
+
+ARG NODE_IMAGE=node:20.19.5-bookworm-slim@sha256:9e70124bd00f47dd023e349cd587132ae61892acc0e47ed641416c3e18f401c3
+ARG GO_IMAGE=golang:1.24.13-alpine3.23@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191
+ARG RUNTIME_IMAGE=alpine:3.22.5@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
+
+FROM ${NODE_IMAGE} AS web-builder
+
 ARG VERSION=dev
-
-FROM node:20 AS builder
-
-ARG VERSION
-
+ARG COMMIT=unknown
+ENV HUSKY=0
 WORKDIR /build
-COPY ./web/package.json ./
-COPY ./web/pnpm-lock.yaml ./
+COPY ./web/package.json ./web/pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
 COPY ./web ./
-RUN NEXT_PUBLIC_APP_VERSION="$VERSION" pnpm build
+RUN NEXT_BUILD_ID="$COMMIT" NEXT_PUBLIC_APP_VERSION="$VERSION" pnpm build:embedded
 
-FROM node:20 AS zashboard-builder
+FROM ${NODE_IMAGE} AS zashboard-builder
 
+ARG COMMIT=unknown
+ENV HUSKY=0
 WORKDIR /build
-COPY ./zashboard/package.json ./
-COPY ./zashboard/pnpm-lock.yaml ./
+COPY ./zashboard/package.json ./zashboard/pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
 COPY ./zashboard ./
-RUN pnpm build
+RUN ZASHBOARD_COMMIT_ID="$COMMIT" pnpm build:embedded
 
-FROM golang:1.24 AS builder2
+FROM scratch AS frontend-assets
+COPY --from=web-builder /build/build /web/build
+COPY --from=zashboard-builder /build/dist /zashboard/dist
 
-ARG VERSION
+FROM ${GO_IMAGE} AS server-builder
 
-ENV GO111MODULE=on \
-    CGO_ENABLED=0 \
-    GOOS=linux
-
+ARG VERSION=dev
+ENV CGO_ENABLED=0 GOOS=linux
 WORKDIR /build
+COPY ./go.mod ./go.sum ./
+RUN go mod download && go mod verify
 COPY . .
-COPY --from=builder /build/build ./web/build
+RUN rm -rf ./web/build ./zashboard/dist
+COPY --from=web-builder /build/build ./web/build
 COPY --from=zashboard-builder /build/dist ./zashboard/dist
-RUN go mod download
-RUN go build -trimpath -ldflags "-s -w -X 'poolx/internal/pkg/common.Version=$VERSION'" -o poolx-server .
+RUN go test -tags embedassets -run '^TestProductionBuildEmbedsBothFrontends$' -count=1 . && \
+    go build -tags embedassets -trimpath -buildvcs=false \
+      -ldflags "-s -w -X poolx/internal/pkg/common.Version=$VERSION" \
+      -o /out/poolnext-server .
 
-FROM alpine
+FROM ${RUNTIME_IMAGE} AS runtime
 
-ENV PORT=3000
-COPY --from=builder2 /build/poolx-server /
-EXPOSE 3000
+RUN apk add --no-cache ca-certificates tzdata && \
+    addgroup -S -g 10001 poolnext && \
+    adduser -S -D -H -u 10001 -G poolnext poolnext && \
+    install -d -o poolnext -g poolnext -m 0750 /data
+
+ENV PORT=3000 \
+    GIN_MODE=release \
+    SQLITE_PATH=/data/poolnext.db \
+    UPLOAD_PATH=/data/upload \
+    POOLNEXT_BOOTSTRAP_FILE=/data/poolnext-bootstrap.txt
+COPY --from=server-builder --chown=root:root /out/poolnext-server /usr/local/bin/poolnext-server
+USER 10001:10001
 WORKDIR /data
-ENTRYPOINT ["/poolx-server"]
+EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
+  CMD wget -q -O /dev/null http://127.0.0.1:3000/api/status || exit 1
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/usr/local/bin/poolnext-server"]

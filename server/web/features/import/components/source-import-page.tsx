@@ -70,7 +70,9 @@ function maskSubscriptionURL(value?: string) {
   }
 }
 
-function sourceConfigOriginLabel(sourceConfig: SourceParseResult['source_config']) {
+function sourceConfigOriginLabel(
+  sourceConfig: SourceParseResult['source_config'],
+) {
   if (sourceConfig.source_type === 'subscription_url') {
     return `来源订阅 ${maskSubscriptionURL(sourceConfig.source_url)}`;
   }
@@ -96,9 +98,13 @@ export function SourceImportPanel({
   const [sourceMode, setSourceMode] = useState<SourceInputMode>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [subscriptionURL, setSubscriptionURL] = useState('');
-  const [parseResult, setParseResult] = useState<SourceParseResult | null>(null);
+  const [parseResult, setParseResult] = useState<SourceParseResult | null>(
+    null,
+  );
   const [previewNodes, setPreviewNodes] = useState<ParsedNodePreview[]>([]);
-  const [selectedFingerprints, setSelectedFingerprints] = useState<string[]>([]);
+  const [selectedFingerprints, setSelectedFingerprints] = useState<string[]>(
+    [],
+  );
   const [testResults, setTestResults] = useState<ParsedNodeTestResult[]>([]);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
 
@@ -155,7 +161,10 @@ export function SourceImportPanel({
       if (!parseResult) {
         throw new Error('请先完成解析。');
       }
-      return importSourceConfig(parseResult.source_config.id, selectedFingerprints);
+      return importSourceConfig(
+        parseResult.source_config.id,
+        selectedFingerprints,
+      );
     },
     onSuccess: (result) => {
       onImportSuccess?.(result);
@@ -216,7 +225,9 @@ export function SourceImportPanel({
       total_nodes: previewNodes.length + parseResult.errors.length,
       valid_nodes: previewNodes.length,
       invalid_nodes: parseResult.errors.length,
-      duplicate_nodes: previewNodes.filter((node) => node.duplicate_scope !== 'none').length,
+      duplicate_nodes: previewNodes.filter(
+        (node) => node.duplicate_scope !== 'none',
+      ).length,
       importable_nodes: importableNodes.length,
     };
   }, [importableNodes.length, parseResult, previewNodes]);
@@ -353,7 +364,10 @@ export function SourceImportPanel({
                 {summary.total_nodes}
               </p>
             </AppCard>
-            <AppCard title="有效节点" description="满足最小字段要求的可识别节点。">
+            <AppCard
+              title="有效节点"
+              description="满足最小字段要求的可识别节点。"
+            >
               <p className="text-2xl font-semibold text-[var(--foreground-primary)]">
                 {summary.valid_nodes}
               </p>
@@ -375,10 +389,7 @@ export function SourceImportPanel({
             </AppCard>
           </div>
 
-          <AppCard
-            title="导入确认"
-            description={importSourceDescription}
-          >
+          <AppCard title="导入确认" description={importSourceDescription}>
             <div className="flex flex-wrap gap-3">
               <PrimaryButton
                 type="button"
@@ -386,7 +397,9 @@ export function SourceImportPanel({
                   setFeedback(null);
                   testMutation.mutate();
                 }}
-                disabled={testMutation.isPending || selectedFingerprints.length === 0}
+                disabled={
+                  testMutation.isPending || selectedFingerprints.length === 0
+                }
               >
                 {testMutation.isPending ? '测速中...' : '测速选中节点'}
               </PrimaryButton>
@@ -397,8 +410,7 @@ export function SourceImportPanel({
                   importMutation.mutate();
                 }}
                 disabled={
-                  importMutation.isPending ||
-                  selectedFingerprints.length === 0
+                  importMutation.isPending || selectedFingerprints.length === 0
                 }
               >
                 {importMutation.isPending ? '导入中...' : '导入节点池'}
@@ -425,7 +437,10 @@ export function SourceImportPanel({
                 type="button"
                 onClick={() => {
                   if (selectedFingerprints.length === 0) {
-                    setFeedback({ tone: 'danger', message: '请先选择要删除的预览节点。' });
+                    setFeedback({
+                      tone: 'danger',
+                      message: '请先选择要删除的预览节点。',
+                    });
                     return;
                   }
                   setPreviewNodes((previous) =>
@@ -437,7 +452,8 @@ export function SourceImportPanel({
                   setTestResults([]);
                   setFeedback({
                     tone: 'info',
-                    message: '已从当前预览中移除选中节点，本次导入和测速都不会再包含它们。',
+                    message:
+                      '已从当前预览中移除选中节点，本次导入和测速都不会再包含它们。',
                   });
                 }}
               >
@@ -464,7 +480,10 @@ export function SourceImportPanel({
                           checked={selectedSet.has(node.fingerprint)}
                           disabled={node.duplicate_scope !== 'none'}
                           onChange={(event) =>
-                            handleToggleNode(node.fingerprint, event.target.checked)
+                            handleToggleNode(
+                              node.fingerprint,
+                              event.target.checked,
+                            )
                           }
                           className="mt-1 h-4 w-4 rounded border-[var(--border-default)] accent-[var(--brand-primary)]"
                         />
@@ -473,13 +492,16 @@ export function SourceImportPanel({
                             {node.name}
                           </p>
                           <p className="text-sm text-[var(--foreground-secondary)]">
-                            {node.type.toUpperCase()} · {node.server}:{node.port}
+                            {node.type.toUpperCase()} · {node.server}:
+                            {node.port}
                           </p>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-                          {selectedSet.has(node.fingerprint) ? '已选择' : '未选择'}
+                          {selectedSet.has(node.fingerprint)
+                            ? '已选择'
+                            : '未选择'}
                         </p>
                         <span className="inline-flex min-h-9 items-center rounded-full border border-[var(--border-default)] px-3 text-xs text-[var(--foreground-secondary)]">
                           {duplicateScopeLabel(node.duplicate_scope)}
@@ -536,7 +558,9 @@ export function SourceImportPanel({
                         {item.node_name}
                       </p>
                       <div className="mt-2 text-xs leading-6 text-[var(--foreground-secondary)]">
-                        <p>结果：{item.status === 'success' ? '成功' : '失败'}</p>
+                        <p>
+                          结果：{item.status === 'success' ? '成功' : '失败'}
+                        </p>
                         <p>目标：{item.dial_address}</p>
                         <p>
                           耗时：
@@ -544,7 +568,9 @@ export function SourceImportPanel({
                             ? ` ${item.latency_ms} ms`
                             : ' 未记录'}
                         </p>
-                        {item.error_message ? <p>错误：{item.error_message}</p> : null}
+                        {item.error_message ? (
+                          <p>错误：{item.error_message}</p>
+                        ) : null}
                       </div>
                     </div>
                   ))

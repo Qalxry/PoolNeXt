@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"context"
 	"poolx/internal/service"
 	"strconv"
 
@@ -30,7 +29,7 @@ func GetRuntimeStatus(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/runtime/start [post]
 func StartRuntime(c *gin.Context) {
-	status, err := service.StartRuntime(context.Background())
+	status, err := service.StartRuntime(c.Request.Context())
 	if err != nil {
 		respondFailure(c, err.Error())
 		return
@@ -45,7 +44,7 @@ func StartRuntime(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/runtime/stop [post]
 func StopRuntime(c *gin.Context) {
-	status, err := service.StopRuntime(context.Background())
+	status, err := service.StopRuntime(c.Request.Context())
 	if err != nil {
 		respondFailure(c, err.Error())
 		return
@@ -60,7 +59,7 @@ func StopRuntime(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/runtime/reload [post]
 func ReloadRuntime(c *gin.Context) {
-	status, err := service.ReloadRuntime(context.Background())
+	status, err := service.ReloadRuntime(c.Request.Context())
 	if err != nil {
 		respondFailure(c, err.Error())
 		return

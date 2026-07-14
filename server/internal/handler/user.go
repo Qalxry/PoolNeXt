@@ -1,13 +1,19 @@
 package controller
 
 import (
+	"net/url"
+	"poolx/internal/middleware"
 	"poolx/internal/model"
 	"poolx/internal/service"
 	"strconv"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
+
+const authAuditFieldLimit = 64
 
 type LoginRequest struct {
 	Username string `json:"username"`
@@ -19,6 +25,15 @@ type ManageRequest struct {
 	Action   string `json:"action"`
 }
 
+type EmailBindRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+type WeChatBindRequest struct {
+	Code string `json:"code"`
+}
+
 func Login(c *gin.Context) {
 	var loginRequest LoginRequest
 	if err := decodeJSONBody(c.Request.Body, &loginRequest); err != nil {
@@ -28,43 +43,43 @@ func Login(c *gin.Context) {
 	}
 	user, err := service.AuthenticateUser(service.LoginInput(loginRequest))
 	if err != nil {
-		_ = service.AppLog.Push(model.AppLogClassificationSecurity, model.AppLogLevelWarn, "login failed | username="+loginRequest.Username+" | reason="+err.Error())
+		_ = service.AppLog.Push(model.AppLogClassificationSecurity, model.AppLogLevelWarn, "login failed | username="+authAuditValue(loginRequest.Username)+" | reason="+authAuditValue(err.Error()))
 		respondFailure(c, err.Error())
 		return
 	}
-	_ = service.AppLog.Push(model.AppLogClassificationSecurity, model.AppLogLevelInfo, "login succeeded | username="+user.Username)
+	_ = service.AppLog.Push(model.AppLogClassificationSecurity, model.AppLogLevelInfo, "login succeeded | username="+authAuditValue(user.Username))
 	setupLogin(user, c)
 }
 
 func setupLogin(user *model.User, c *gin.Context) {
-	session := sessions.Default(c)
-	session.Set("id", user.Id)
-	session.Set("username", user.Username)
-	session.Set("role", user.Role)
-	session.Set("status", user.Status)
-	if err := session.Save(); err != nil {
+	if err := middleware.SetAuthenticatedSession(c, user); err != nil {
 		respondFailure(c, "无法保存会话信息，请重试")
 		return
 	}
-	cleanUser := model.User{
-		Id:          user.Id,
-		Username:    user.Username,
-		DisplayName: user.DisplayName,
-		Role:        user.Role,
-		Status:      user.Status,
+	respondSuccess(c, cleanAuthUser(user))
+}
+
+func cleanAuthUser(user *model.User) model.User {
+	return model.User{
+		Id:                 user.Id,
+		Username:           user.Username,
+		DisplayName:        user.DisplayName,
+		Role:               user.Role,
+		Status:             user.Status,
+		MustChangePassword: user.MustChangePassword,
+		Email:              user.Email,
+		GitHubId:           user.GitHubId,
+		WeChatId:           user.WeChatId,
 	}
-	respondSuccess(c, cleanUser)
 }
 
 func Logout(c *gin.Context) {
 	username := c.GetString("username")
-	session := sessions.Default(c)
-	session.Clear()
-	if err := session.Save(); err != nil {
+	if err := middleware.DestroySession(c); err != nil {
 		respondFailure(c, err.Error())
 		return
 	}
-	_ = service.AppLog.Push(model.AppLogClassificationSecurity, model.AppLogLevelInfo, "logout succeeded | username="+username)
+	_ = service.AppLog.Push(model.AppLogClassificationSecurity, model.AppLogLevelInfo, "logout succeeded | username="+authAuditValue(username))
 	respondSuccessMessage(c, "")
 }
 
@@ -76,11 +91,11 @@ func Register(c *gin.Context) {
 		return
 	}
 	if err := service.RegisterUser(user); err != nil {
-		_ = service.AppLog.Push(model.AppLogClassificationSecurity, model.AppLogLevelWarn, "register failed | username="+user.Username+" | reason="+err.Error())
+		_ = service.AppLog.Push(model.AppLogClassificationSecurity, model.AppLogLevelWarn, "register failed | username="+authAuditValue(user.Username)+" | reason="+authAuditValue(err.Error()))
 		respondFailure(c, err.Error())
 		return
 	}
-	_ = service.AppLog.Push(model.AppLogClassificationBusiness, model.AppLogLevelInfo, "register succeeded | username="+user.Username)
+	_ = service.AppLog.Push(model.AppLogClassificationBusiness, model.AppLogLevelInfo, "register succeeded | username="+authAuditValue(user.Username))
 	respondSuccessMessage(c, "")
 }
 
@@ -154,8 +169,13 @@ func UpdateSelf(c *gin.Context) {
 		respondFailure(c, "无效的参数")
 		return
 	}
-	if err := service.UpdateSelf(c.GetInt("id"), user); err != nil {
+	updatedUser, err := service.UpdateSelf(c.GetInt("id"), user)
+	if err != nil {
 		respondFailure(c, err.Error())
+		return
+	}
+	if err := middleware.SetAuthenticatedSession(c, updatedUser); err != nil {
+		respondFailure(c, "资料已更新，但无法刷新会话，请重新登录")
 		return
 	}
 	respondSuccessMessage(c, "")
@@ -179,6 +199,7 @@ func DeleteSelf(c *gin.Context) {
 		respondFailure(c, err.Error())
 		return
 	}
+	_ = middleware.DestroySession(c)
 	respondSuccessMessage(c, "")
 }
 
@@ -210,9 +231,69 @@ func ManageUser(c *gin.Context) {
 }
 
 func EmailBind(c *gin.Context) {
-	if err := service.BindEmail(c.GetInt("id"), c.Query("email"), c.Query("code")); err != nil {
+	if !requireSameOriginMutation(c) {
+		return
+	}
+	var req EmailBindRequest
+	if err := decodeJSONBody(c.Request.Body, &req); err != nil {
+		respondFailure(c, "无效的参数")
+		return
+	}
+	if err := service.BindEmail(c.Request.Context(), c.GetInt("id"), req.Email, req.Code); err != nil {
 		respondFailure(c, err.Error())
 		return
 	}
 	respondSuccessMessage(c, "")
+}
+
+func WeChatBindSecure(c *gin.Context) {
+	if !requireSameOriginMutation(c) {
+		return
+	}
+	var req WeChatBindRequest
+	if err := decodeJSONBody(c.Request.Body, &req); err != nil {
+		respondFailure(c, "无效的参数")
+		return
+	}
+	if err := service.BindWeChatAccountContext(c.Request.Context(), c.GetInt("id"), req.Code); err != nil {
+		respondFailure(c, err.Error())
+		return
+	}
+	respondSuccessMessage(c, "")
+}
+
+func requireSameOriginMutation(c *gin.Context) bool {
+	if contentType := strings.ToLower(strings.TrimSpace(c.GetHeader("Content-Type"))); !strings.HasPrefix(contentType, "application/json") {
+		respondBadRequest(c, "仅接受 JSON 请求")
+		return false
+	}
+	if site := strings.ToLower(strings.TrimSpace(c.GetHeader("Sec-Fetch-Site"))); site != "" && site != "same-origin" {
+		respondBadRequest(c, "跨站请求已被拒绝")
+		return false
+	}
+
+	source := strings.TrimSpace(c.GetHeader("Origin"))
+	if source == "" {
+		source = strings.TrimSpace(c.GetHeader("Referer"))
+	}
+	parsed, err := url.Parse(source)
+	if source == "" || err != nil || parsed.Host == "" || !strings.EqualFold(parsed.Host, c.Request.Host) {
+		respondBadRequest(c, "请求来源无效")
+		return false
+	}
+	return true
+}
+
+func authAuditValue(value string) string {
+	value = strings.Map(func(char rune) rune {
+		if unicode.IsControl(char) {
+			return ' '
+		}
+		return char
+	}, strings.TrimSpace(value))
+	if utf8.RuneCountInString(value) <= authAuditFieldLimit {
+		return value
+	}
+	runes := []rune(value)
+	return string(runes[:authAuditFieldLimit]) + "..."
 }

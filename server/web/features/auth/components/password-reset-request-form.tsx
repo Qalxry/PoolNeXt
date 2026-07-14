@@ -27,7 +27,10 @@ type ResetRequestFormValues = z.infer<typeof resetRequestSchema>;
 
 export function PasswordResetRequestForm() {
   const [turnstileToken, setTurnstileToken] = useState('');
-  const [message, setMessage] = useState<{ tone: 'success' | 'danger' | 'info'; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    tone: 'success' | 'danger' | 'info';
+    text: string;
+  } | null>(null);
 
   const form = useForm<ResetRequestFormValues>({
     resolver: zodResolver(resetRequestSchema),
@@ -47,7 +50,10 @@ export function PasswordResetRequestForm() {
       form.reset();
     },
     onError: (error: Error) => {
-      setMessage({ tone: 'danger', text: error.message || '重置邮件发送失败，请稍后重试。' });
+      setMessage({
+        tone: 'danger',
+        text: error.message || '重置邮件发送失败，请稍后重试。',
+      });
     },
   });
 
@@ -62,18 +68,26 @@ export function PasswordResetRequestForm() {
 
   return (
     <PublicAuthGuard>
-      <AppCard title='密码重置' description='提交后，系统会向你的注册邮箱发送重置链接。'>
-        <form className='space-y-4' onSubmit={handleSubmit}>
-          <AuthFormField label='邮箱地址'>
-            <AuthInput type='email' placeholder='请输入邮箱地址' {...form.register('email')} />
+      <AppCard
+        title="密码重置"
+        description="提交后，系统会向你的注册邮箱发送重置链接。"
+      >
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <AuthFormField label="邮箱地址">
+            <AuthInput
+              type="email"
+              placeholder="请输入邮箱地址"
+              {...form.register('email')}
+            />
             {form.formState.errors.email ? (
-              <span className='text-xs text-[var(--status-danger-foreground)]'>
+              <span className="text-xs text-[var(--status-danger-foreground)]">
                 {form.formState.errors.email.message}
               </span>
             ) : null}
           </AuthFormField>
 
-          {statusQuery.data?.turnstile_check && statusQuery.data.turnstile_site_key ? (
+          {statusQuery.data?.turnstile_check &&
+          statusQuery.data.turnstile_site_key ? (
             <TurnstileWidget
               siteKey={statusQuery.data.turnstile_site_key}
               onVerify={(token) => setTurnstileToken(token)}
@@ -82,16 +96,21 @@ export function PasswordResetRequestForm() {
             />
           ) : null}
 
-          {message ? <InlineMessage tone={message.tone} message={message.text} /> : null}
+          {message ? (
+            <InlineMessage tone={message.tone} message={message.text} />
+          ) : null}
 
-          <AuthButton type='submit' disabled={mutation.isPending}>
+          <AuthButton type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? '提交中...' : '发送重置邮件'}
           </AuthButton>
         </form>
 
-        <div className='mt-6 text-sm text-[var(--foreground-secondary)]'>
+        <div className="mt-6 text-sm text-[var(--foreground-secondary)]">
           想起密码了？
-          <Link href='/login' className='ml-2 text-[var(--brand-primary)] transition hover:opacity-80'>
+          <Link
+            href="/login"
+            className="ml-2 text-[var(--brand-primary)] transition hover:opacity-80"
+          >
             返回登录
           </Link>
         </div>

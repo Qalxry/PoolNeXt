@@ -1,6 +1,7 @@
 package security
 
 import (
+	"crypto/subtle"
 	"strings"
 	"sync"
 	"time"
@@ -47,12 +48,35 @@ func RegisterVerificationCodeWithKey(key string, code string, purpose string) {
 func VerifyCodeWithKey(key string, code string, purpose string) bool {
 	verificationMutex.Lock()
 	defer verificationMutex.Unlock()
-	value, okay := verificationMap[purpose+key]
-	now := time.Now()
-	if !okay || int(now.Sub(value.time).Seconds()) >= VerificationValidMinutes*60 {
+	return verifyCodeWithKeyLocked(key, code, purpose, false)
+
+}
+
+// ConsumeCodeWithKey verifies and deletes a code while holding the same lock,
+// so concurrent reset or binding requests cannot reuse one credential.
+func ConsumeCodeWithKey(key string, code string, purpose string) bool {
+	verificationMutex.Lock()
+	defer verificationMutex.Unlock()
+	return verifyCodeWithKeyLocked(key, code, purpose, true)
+}
+
+func verifyCodeWithKeyLocked(key string, code string, purpose string, consume bool) bool {
+	mapKey := purpose + key
+	value, okay := verificationMap[mapKey]
+	if !okay {
 		return false
 	}
-	return code == value.code
+	if time.Since(value.time) >= time.Duration(VerificationValidMinutes)*time.Minute {
+		delete(verificationMap, mapKey)
+		return false
+	}
+	if subtle.ConstantTimeCompare([]byte(code), []byte(value.code)) != 1 {
+		return false
+	}
+	if consume {
+		delete(verificationMap, mapKey)
+	}
+	return true
 }
 
 func DeleteKey(key string, purpose string) {

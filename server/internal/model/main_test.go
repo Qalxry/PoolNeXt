@@ -253,7 +253,7 @@ func TestRunDatabaseSchemaMigrationDoesNotAdvanceVersionWhenValidationFails(t *t
 	}
 }
 
-func TestEnsureDatabaseSchemaUpToDateNormalizesHigherRecordedVersionToCurrentBaseline(t *testing.T) {
+func TestEnsureDatabaseSchemaUpToDateRejectsHigherRecordedVersion(t *testing.T) {
 	db := openBareTestSQLiteDB(t, "normalized-schema-version.db")
 	if err := migratepkg.ComposeAutoMigrator(schemaMetadataModels()...)(db); err != nil {
 		t.Fatalf("auto migrate schema metadata: %v", err)
@@ -269,8 +269,12 @@ func TestEnsureDatabaseSchemaUpToDateNormalizesHigherRecordedVersionToCurrentBas
 		t.Fatalf("seed schema version: %v", err)
 	}
 
-	if err := ensureDatabaseSchemaUpToDate(db, "sqlite"); err != nil {
-		t.Fatalf("ensureDatabaseSchemaUpToDate: %v", err)
+	err := ensureDatabaseSchemaUpToDate(db, "sqlite")
+	if err == nil {
+		t.Fatal("expected future schema version to be rejected")
+	}
+	if !strings.Contains(err.Error(), "newer than application version") || !strings.Contains(err.Error(), "refusing to downgrade") {
+		t.Fatalf("unexpected future schema error: %v", err)
 	}
 
 	loadVersion, _ := migratepkg.NewSchemaVersionStore((&DatabaseSchemaVersion{}).TableName(), databaseSchemaVersionRowID)
@@ -281,8 +285,8 @@ func TestEnsureDatabaseSchemaUpToDateNormalizesHigherRecordedVersionToCurrentBas
 	if !exists {
 		t.Fatal("expected schema version record to exist")
 	}
-	if version != currentDatabaseSchemaVersion {
-		t.Fatalf("unexpected normalized schema version: got %d want %d", version, currentDatabaseSchemaVersion)
+	if version != 10 {
+		t.Fatalf("future schema version was overwritten: got %d want 10", version)
 	}
 }
 

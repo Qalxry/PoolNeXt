@@ -4,6 +4,7 @@ export interface AuthUser {
   display_name: string;
   role: number;
   status: number;
+  must_change_password: boolean;
   email?: string;
   github_id?: string;
   wechat_id?: string;
@@ -24,4 +25,14 @@ export interface RegisterPayload {
 export interface PasswordResetRequestPayload {
   email: string;
   token: string;
+}
+
+export interface GitHubOAuthStart {
+  authorize_url: string;
+}
+
+export interface GitHubOAuthResult {
+  user: AuthUser;
+  redirect: string;
+  mode: 'login' | 'bind';
 }

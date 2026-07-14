@@ -46,7 +46,7 @@ const docTemplate = `{
                 "tags": [
                     "Kernel"
                 ],
-                "summary": "Download latest official Mihomo binary for current platform and verify version",
+                "summary": "Download the latest official Mihomo binary into managed storage and verify its version",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -69,7 +69,7 @@ const docTemplate = `{
                 "tags": [
                     "Kernel"
                 ],
-                "summary": "Inspect existing Mihomo binary path and verify version",
+                "summary": "Register an existing Mihomo binary as external immutable and verify its version",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -92,7 +92,7 @@ const docTemplate = `{
                 "tags": [
                     "Kernel"
                 ],
-                "summary": "Upload Mihomo binary, install it to target path and verify version",
+                "summary": "Upload a managed Mihomo binary, install it to target path and verify version",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -909,8 +909,8 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "",
 	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
-	Title:            "PoolX Server API",
-	Description:      "PoolX Server API documentation.",
+	Title:            "PoolNeXt Server API",
+	Description:      "PoolNeXt Server API documentation.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -17,8 +17,12 @@ function toDate(value: string | Date | null | undefined) {
     return null;
   }
 
-  const normalizedValue = typeof value === 'string' ? value.replace(' ', 'T') : value;
-  const date = normalizedValue instanceof Date ? normalizedValue : new Date(normalizedValue);
+  const normalizedValue =
+    typeof value === 'string' ? value.replace(' ', 'T') : value;
+  const date =
+    normalizedValue instanceof Date
+      ? normalizedValue
+      : new Date(normalizedValue);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -36,7 +40,9 @@ export function formatDateTime(value: string | Date | null | undefined) {
   return dateTimeFormatter.format(date).replace(/\//g, '-');
 }
 
-export function formatDateTimeWithMilliseconds(value: string | Date | null | undefined) {
+export function formatDateTimeWithMilliseconds(
+  value: string | Date | null | undefined,
+) {
   const date = toDate(value);
 
   if (!date) {

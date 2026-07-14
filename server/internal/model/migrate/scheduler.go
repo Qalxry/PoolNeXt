@@ -97,13 +97,10 @@ func (s *Scheduler) initializeFresh() error {
 
 func (s *Scheduler) upgrade(version int) error {
 	if version > s.latestVersion {
-		if err := s.initializer.Validate(s.db, s.backend); err != nil {
-			return fmt.Errorf("database schema version %d is newer than application version %d and current schema validation failed: %w", version, s.latestVersion, err)
-		}
-		return s.saveVersion(s.db, s.latestVersion)
+		return fmt.Errorf("database schema version %d is newer than application version %d; refusing to downgrade metadata", version, s.latestVersion)
 	}
 	if version == s.latestVersion {
-		return s.initializer.Validate(s.db, s.backend)
+		return s.validateVersion(version)
 	}
 
 	for nextVersion := version + 1; nextVersion <= s.latestVersion; nextVersion++ {
@@ -116,6 +113,17 @@ func (s *Scheduler) upgrade(version int) error {
 		}
 	}
 	return nil
+}
+
+func (s *Scheduler) validateVersion(version int) error {
+	if version == s.initializer.Version {
+		return s.initializer.Validate(s.db, s.backend)
+	}
+	migration, ok := s.migrationsByTarget[version]
+	if !ok {
+		return fmt.Errorf("database schema validation for v%d is not defined", version)
+	}
+	return migration.Validate(s.db, s.backend)
 }
 
 func (s *Scheduler) runMigration(migration Migration) error {

@@ -33,6 +33,19 @@ func TestCreatePortProfileUsesStrategyGroupNameAsName(t *testing.T) {
 	}
 }
 
+func TestNormalizePortProfilePayloadUsesPoolNeXtDefaultName(t *testing.T) {
+	normalized, err := normalizePortProfilePayload(PortProfilePayload{
+		MixedPort: 17895,
+		NodeIDs:   []int{1},
+	})
+	if err != nil {
+		t.Fatalf("normalize port profile: %v", err)
+	}
+	if normalized.Name != "PoolNeXt" {
+		t.Fatalf("expected PoolNeXt default profile name, got %q", normalized.Name)
+	}
+}
+
 func TestCreatePortProfileRejectsDuplicateStrategyGroupName(t *testing.T) {
 	setupServiceTestDB(t)
 

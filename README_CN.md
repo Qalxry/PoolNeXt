@@ -4,7 +4,7 @@
 
 <div align="center">
 
-# PoolX
+# PoolNeXt
 
 基于 Gin 和 Next.js 的代理池控制面，核心目标是把 Clash/Mihomo 节点组织成可复用的代理池，服务爬虫、抓取、代理请求和自动化出网场景。
 </div>
@@ -16,7 +16,7 @@
 > 本项目仅为代理池控制面, 不提供节点以及其获取方式。本项目仅供学习、研究与技术交流使用，禁止用于任何非法用途。
 
 > [!WARNING]
-> 使用 root 用户初次登录系统后，务必修改默认密码 `123456`！
+> 首次启动时，PoolNeXt 会在 SQLite 数据库旁（或 `POOLNEXT_BOOTSTRAP_FILE` 指定位置）写入 `poolnext-bootstrap.txt`，其中包含随机一次性 root 密码。请仅在本机读取，登录后立即修改密码；文件随后会被删除。
 
 ## 项目介绍
 
@@ -57,7 +57,7 @@
 
 Login URL: `http://IP:3000/`
 Username: `root`
-Password: `123456`
+Password: Docker 部署读取 `/data/poolnext-bootstrap.txt`；本地部署读取 SQLite 数据库旁的 `poolnext-bootstrap.txt`。
 
 ### Docker 部署
 
@@ -69,7 +69,7 @@ services:
     environment:
       POSTGRES_DB: poolx
       POSTGRES_USER: poolx
-      POSTGRES_PASSWORD: replace-with-strong-password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请先设置 POSTGRES_PASSWORD}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -78,8 +78,8 @@ services:
       timeout: 5s
       retries: 5
 
-  poolx:
-    image: ghcr.io/rain-kl/poolx:latest
+  poolnext:
+    image: ghcr.io/qalxry/poolnext:latest
     restart: unless-stopped
     depends_on:
       postgres:
@@ -88,11 +88,12 @@ services:
       - "3000:3000"
 #     开放代理监听端口
     environment:
-      SESSION_SECRET: replace-with-random-string
+      SESSION_SECRET: ${SESSION_SECRET:?请先设置高强度 SESSION_SECRET}
+      POOLNEXT_BOOTSTRAP_FILE: /data/poolnext-bootstrap.txt
 #     在指定 SQL_DSN 的情况下, 以下内容不会生效
       SQLITE_PATH: /data/poolx.db
 #     如果使用 Sqlite, 注释掉 SQL_DSN, 并且移除 postgres service
-      SQL_DSN: postgres://poolx:replace-with-strong-password@postgres:5432/poolx?sslmode=disable
+      SQL_DSN: postgres://poolx:${POSTGRES_PASSWORD}@postgres:5432/poolx?sslmode=disable
       GIN_MODE: release
       LOG_LEVEL: info
 
@@ -105,22 +106,24 @@ services:
 
 ```bash
 # 使用 SQLite 启动
-SESSION_SECRET=replace-with-random-string \
+SESSION_SECRET="$(openssl rand -hex 32)" \
 SQLITE_PATH=/path/to/poolx.db \
-./poolx
+./poolnext-server
 ```
 
 访问地址：`http://localhost:3000`
 
-默认账号：
+初始账号：
 
 * 用户名：`root`
-* 密码：`123456`
+* 密码：`/path/to/poolnext-bootstrap.txt` 中的随机一次性密码
+
+凭据文件权限为 `0600`，首次修改密码后自动删除。生产模式会拒绝缺失、弱值或占位值 `SESSION_SECRET`。
 
 
 ## 配置说明
 
-PoolX 不要求你手工维护一个固定的配置文件。
+PoolNeXt 不要求你手工维护一个固定的配置文件。
 
 它的核心流程是：
 
@@ -136,4 +139,6 @@ PoolX 不要求你手工维护一个固定的配置文件。
 
 ## License
 
-本项目采用 [Apache License 2.0](./LICENSE) 开源。
+PoolNeXt 由 [Qalxry/PoolNeXt](https://github.com/Qalxry/PoolNeXt) 持续维护。项目 fork 自已经停止维护的 [Rain-kl/PoolX](https://github.com/Rain-kl/PoolX)，该链接仅用于历史来源与归属说明；PoolNeXt 的发布、问题追踪、容器镜像和自动更新均使用 Qalxry 仓库。
+
+本项目采用 [Apache License 2.0](./LICENSE) 开源。包括内置 Zashboard MIT 声明在内的第三方归属信息见 [NOTICE](./NOTICE)。

@@ -129,7 +129,9 @@ function toProfilePayload(item: PortProfileWithNodes): PortProfilePayload {
 
 export function WorkspacePage() {
   const queryClient = useQueryClient();
-  const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null);
+  const [selectedProfileId, setSelectedProfileId] = useState<number | null>(
+    null,
+  );
   const [isCreating, setIsCreating] = useState(false);
   const [payload, setPayload] = useState<PortProfilePayload>(defaultPayload);
   const [nodeSearch, setNodeSearch] = useState('');
@@ -169,16 +171,16 @@ export function WorkspacePage() {
       profilesQuery.data.length === 0 ||
       selectedProfileId !== null
     ) {
-      return
+      return;
     }
-    setSelectedProfileId(profilesQuery.data[0].profile.id)
-  }, [isCreating, profilesQuery.data, selectedProfileId])
+    setSelectedProfileId(profilesQuery.data[0].profile.id);
+  }, [isCreating, profilesQuery.data, selectedProfileId]);
 
   useEffect(() => {
     if (!detailQuery.data) {
-      return
+      return;
     }
-    const { profile, node_ids } = detailQuery.data
+    const { profile, node_ids } = detailQuery.data;
     setPayload({
       name: profile.name,
       listen_host: profile.listen_host,
@@ -188,7 +190,7 @@ export function WorkspacePage() {
       proxy_settings: normalizeProxySettings(profile.proxy_settings),
       include_in_runtime: profile.include_in_runtime,
       node_ids,
-    })
+    });
     if (detailQuery.data.runtime) {
       setPreview({
         profile,
@@ -197,50 +199,52 @@ export function WorkspacePage() {
         kernel_type: detailQuery.data.runtime.kernel_type,
         checksum: detailQuery.data.runtime.checksum,
         content: detailQuery.data.runtime.rendered_config,
-      })
+      });
     } else {
-      setPreview(null)
+      setPreview(null);
     }
-  }, [detailQuery.data])
+  }, [detailQuery.data]);
 
   const createMutation = useMutation({
     mutationFn: async () => createPortProfile(toPayload(payload)),
     onSuccess: async (result) => {
-      setFeedback({ tone: 'success', message: '端口配置已创建。' })
-      setIsCreating(false)
-      setSelectedProfileId(result.profile.id)
-      await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey })
+      setFeedback({ tone: 'success', message: '端口配置已创建。' });
+      setIsCreating(false);
+      setSelectedProfileId(result.profile.id);
+      await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey });
     },
     onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) })
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
     },
-  })
+  });
 
   const updateMutation = useMutation({
     mutationFn: async (id: number) => updatePortProfile(id, toPayload(payload)),
     onSuccess: async () => {
-      setFeedback({ tone: 'success', message: '端口配置已保存。' })
-      await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey })
-      await queryClient.invalidateQueries({ queryKey: ['workspace', 'profile', selectedProfileId] })
+      setFeedback({ tone: 'success', message: '端口配置已保存。' });
+      await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey });
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'profile', selectedProfileId],
+      });
     },
     onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) })
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
     },
-  })
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => deletePortProfile(id),
     onSuccess: async (_, id) => {
-      setFeedback({ tone: 'success', message: '端口配置已删除。' })
-      setPreview(null)
-      setSelectedProfileId((current) => (current === id ? null : current))
-      setPayload(defaultPayload)
-      await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey })
+      setFeedback({ tone: 'success', message: '端口配置已删除。' });
+      setPreview(null);
+      setSelectedProfileId((current) => (current === id ? null : current));
+      setPayload(defaultPayload);
+      await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey });
     },
     onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) })
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
     },
-  })
+  });
 
   const toggleRuntimeInclusionMutation = useMutation({
     mutationFn: async ({
@@ -267,67 +271,77 @@ export function WorkspacePage() {
     onError: (error) => {
       setFeedback({ tone: 'danger', message: getErrorMessage(error) });
     },
-  })
+  });
 
   const previewMutation = useMutation({
     mutationFn: async () => previewPortProfile(toPayload(payload)),
     onSuccess: (result) => {
-      setPreview(result)
-      setFeedback({ tone: 'success', message: '配置片段预览已生成。' })
+      setPreview(result);
+      setFeedback({ tone: 'success', message: '配置片段预览已生成。' });
     },
     onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) })
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
     },
-  })
+  });
 
   const saveRuntimeMutation = useMutation({
     mutationFn: async (id: number) => saveRuntimeConfig(id),
     onSuccess: async () => {
-      setFeedback({ tone: 'success', message: '当前片段已保存为最新快照。' })
-      await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey })
-      await queryClient.invalidateQueries({ queryKey: ['workspace', 'profile', selectedProfileId] })
+      setFeedback({ tone: 'success', message: '当前片段已保存为最新快照。' });
+      await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey });
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'profile', selectedProfileId],
+      });
     },
     onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) })
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
     },
-  })
+  });
 
   const saveTemplateMutation = useMutation({
-    mutationFn: async () => savePortProfileTemplate(templateName, toPayload(payload)),
+    mutationFn: async () =>
+      savePortProfileTemplate(templateName, toPayload(payload)),
     onSuccess: async () => {
-      setFeedback({ tone: 'success', message: '工作台模板已保存。' })
-      setTemplateName('')
-      await queryClient.invalidateQueries({ queryKey: ['workspace', 'templates'] })
+      setFeedback({ tone: 'success', message: '工作台模板已保存。' });
+      setTemplateName('');
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'templates'],
+      });
     },
     onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) })
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
     },
-  })
+  });
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: number) => deletePortProfileTemplate(id),
     onSuccess: async () => {
-      setFeedback({ tone: 'success', message: '工作台模板已删除。' })
-      await queryClient.invalidateQueries({ queryKey: ['workspace', 'templates'] })
+      setFeedback({ tone: 'success', message: '工作台模板已删除。' });
+      await queryClient.invalidateQueries({
+        queryKey: ['workspace', 'templates'],
+      });
     },
     onError: (error) => {
-      setFeedback({ tone: 'danger', message: getErrorMessage(error) })
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
     },
-  })
+  });
 
-  const profileList = profilesQuery.data ?? []
-  const templateList = templatesQuery.data ?? []
-  const nodeOptions = nodeOptionsQuery.data ?? []
-  const selectedNodeSet = useMemo(() => new Set(payload.node_ids), [payload.node_ids])
-  const capability = capabilityQuery.data
+  const profileList = profilesQuery.data ?? [];
+  const templateList = templatesQuery.data ?? [];
+  const nodeOptions = nodeOptionsQuery.data ?? [];
+  const selectedNodeSet = useMemo(
+    () => new Set(payload.node_ids),
+    [payload.node_ids],
+  );
+  const capability = capabilityQuery.data;
 
   const handleCreateNew = () => {
-    setIsCreating(true)
-    setSelectedProfileId(null)
-    setPayload(defaultPayload)
-    setPreview(null)
-    setFeedback(null)
-  }
+    setIsCreating(true);
+    setSelectedProfileId(null);
+    setPayload(defaultPayload);
+    setPreview(null);
+    setFeedback(null);
+  };
 
   const handleToggleNode = (nodeId: number, checked: boolean) => {
     setPayload((current) => ({
@@ -335,20 +349,20 @@ export function WorkspacePage() {
       node_ids: checked
         ? Array.from(new Set([...current.node_ids, nodeId]))
         : current.node_ids.filter((item) => item !== nodeId),
-    }))
-  }
+    }));
+  };
 
   const strategyDescription = {
     select: '手动选择固定出口',
     'url-test': '按 URL 延迟自动选择',
     fallback: '按优先级与可用性自动切换',
     'load-balance': '按负载均衡策略分散请求，可切换一致性哈希或轮询',
-  } satisfies Record<PortProfileStrategy, string>
+  } satisfies Record<PortProfileStrategy, string>;
 
   const applyTemplate = (item: PortProfileTemplateItem) => {
-    setIsCreating(true)
-    setSelectedProfileId(null)
-    setPreview(null)
+    setIsCreating(true);
+    setSelectedProfileId(null);
+    setPreview(null);
     setPayload({
       name: item.template.name,
       listen_host: item.template.listen_host,
@@ -358,8 +372,8 @@ export function WorkspacePage() {
       proxy_settings: normalizeProxySettings(item.template.proxy_settings),
       include_in_runtime: item.template.include_in_runtime,
       node_ids: item.node_ids,
-    })
-  }
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -373,8 +387,12 @@ export function WorkspacePage() {
         }
       />
 
-      {feedback ? <InlineMessage tone={feedback.tone} message={feedback.message} /> : null}
-      {capability ? <InlineMessage tone='info' message={capability.message} /> : null}
+      {feedback ? (
+        <InlineMessage tone={feedback.tone} message={feedback.message} />
+      ) : null}
+      {capability ? (
+        <InlineMessage tone="info" message={capability.message} />
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <div className="space-y-6">
@@ -390,17 +408,22 @@ export function WorkspacePage() {
                   description={getErrorMessage(profilesQuery.error)}
                 />
               ) : null}
-              {!profilesQuery.isLoading && !profilesQuery.isError && profileList.length === 0 ? (
-                <EmptyState title="暂无端口配置" description="点击右上角“新建端口配置”开始。" />
+              {!profilesQuery.isLoading &&
+              !profilesQuery.isError &&
+              profileList.length === 0 ? (
+                <EmptyState
+                  title="暂无端口配置"
+                  description="点击右上角“新建端口配置”开始。"
+                />
               ) : null}
               {profileList.map((item) => (
                 <button
                   key={item.profile.id}
                   type="button"
                   onClick={() => {
-                    setIsCreating(false)
-                    setSelectedProfileId(item.profile.id)
-                    setFeedback(null)
+                    setIsCreating(false);
+                    setSelectedProfileId(item.profile.id);
+                    setFeedback(null);
                   }}
                   className={`w-full rounded-2xl border p-4 text-left transition ${
                     selectedProfileId === item.profile.id
@@ -421,11 +444,11 @@ export function WorkspacePage() {
                         checked={item.profile.include_in_runtime}
                         disabled={toggleRuntimeInclusionMutation.isPending}
                         onCheckedChange={(checked) => {
-                          setFeedback(null)
+                          setFeedback(null);
                           toggleRuntimeInclusionMutation.mutate({
                             item,
                             checked,
-                          })
+                          });
                         }}
                       />
                     </div>
@@ -455,16 +478,22 @@ export function WorkspacePage() {
                 <PrimaryButton
                   type="button"
                   onClick={() => {
-                    setFeedback(null)
-                    saveTemplateMutation.mutate()
+                    setFeedback(null);
+                    saveTemplateMutation.mutate();
                   }}
-                  disabled={saveTemplateMutation.isPending || !capability?.supports_templates}
+                  disabled={
+                    saveTemplateMutation.isPending ||
+                    !capability?.supports_templates
+                  }
                 >
                   {saveTemplateMutation.isPending ? '保存中...' : '保存模板'}
                 </PrimaryButton>
               </div>
               {templateList.length === 0 ? (
-                <EmptyState title="暂无模板" description="保存一个常用工作台配置作为模板。" />
+                <EmptyState
+                  title="暂无模板"
+                  description="保存一个常用工作台配置作为模板。"
+                />
               ) : (
                 <div className="space-y-3">
                   {templateList.map((item) => (
@@ -478,16 +507,22 @@ export function WorkspacePage() {
                             {item.template.name}
                           </p>
                           <p className="text-xs text-[var(--foreground-secondary)]">
-                            {item.template.proxy_settings.strategy_type} · 节点 {item.node_ids.length} 个
+                            {item.template.proxy_settings.strategy_type} · 节点{' '}
+                            {item.node_ids.length} 个
                           </p>
                         </div>
                         <div className="flex gap-2">
-                          <SecondaryButton type="button" onClick={() => applyTemplate(item)}>
+                          <SecondaryButton
+                            type="button"
+                            onClick={() => applyTemplate(item)}
+                          >
                             套用
                           </SecondaryButton>
                           <DangerButton
                             type="button"
-                            onClick={() => deleteTemplateMutation.mutate(item.template.id)}
+                            onClick={() =>
+                              deleteTemplateMutation.mutate(item.template.id)
+                            }
                             disabled={deleteTemplateMutation.isPending}
                           >
                             删除
@@ -511,8 +546,8 @@ export function WorkspacePage() {
                 <PrimaryButton
                   type="button"
                   onClick={() => {
-                    setFeedback(null)
-                    previewMutation.mutate()
+                    setFeedback(null);
+                    previewMutation.mutate();
                   }}
                   disabled={previewMutation.isPending}
                 >
@@ -523,8 +558,8 @@ export function WorkspacePage() {
                     <PrimaryButton
                       type="button"
                       onClick={() => {
-                        setFeedback(null)
-                        updateMutation.mutate(selectedProfileId)
+                        setFeedback(null);
+                        updateMutation.mutate(selectedProfileId);
                       }}
                       disabled={updateMutation.isPending}
                     >
@@ -534,10 +569,10 @@ export function WorkspacePage() {
                       type="button"
                       onClick={() => {
                         if (!window.confirm('确认删除当前端口配置吗？')) {
-                          return
+                          return;
                         }
-                        setFeedback(null)
-                        deleteMutation.mutate(selectedProfileId)
+                        setFeedback(null);
+                        deleteMutation.mutate(selectedProfileId);
                       }}
                       disabled={deleteMutation.isPending}
                     >
@@ -548,8 +583,8 @@ export function WorkspacePage() {
                   <PrimaryButton
                     type="button"
                     onClick={() => {
-                      setFeedback(null)
-                      createMutation.mutate()
+                      setFeedback(null);
+                      createMutation.mutate();
                     }}
                     disabled={createMutation.isPending}
                   >
@@ -560,7 +595,10 @@ export function WorkspacePage() {
             }
           >
             <div className="grid gap-4 xl:grid-cols-2">
-              <ResourceField label="策略组名称" hint={`${strategyDescription[payload.proxy_settings.strategy_type]}；该名称会作为端口配置名称，且必须唯一。`}>
+              <ResourceField
+                label="策略组名称"
+                hint={`${strategyDescription[payload.proxy_settings.strategy_type]}；该名称会作为端口配置名称，且必须唯一。`}
+              >
                 <ResourceInput
                   value={payload.name}
                   onChange={(event) =>
@@ -569,19 +607,22 @@ export function WorkspacePage() {
                       name: event.target.value,
                     }))
                   }
-                  placeholder="例如：POOLX"
+                  placeholder="例如：POOLNEXT"
                 />
               </ResourceField>
               <ResourceField label="监听地址">
                 <ResourceInput
                   value={payload.listen_host}
                   onChange={(event) =>
-                    setPayload((current) => ({ ...current, listen_host: event.target.value }))
+                    setPayload((current) => ({
+                      ...current,
+                      listen_host: event.target.value,
+                    }))
                   }
                   placeholder="127.0.0.1"
                 />
               </ResourceField>
-              <div className="rounded-2xl border border-[var(--border-defau lt)] bg-[var(--surface-muted)] p-4 xl:col-span-2">
+              <div className="border-[var(--border-defau lt)] rounded-2xl border bg-[var(--surface-muted)] p-4 xl:col-span-2">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-[var(--foreground-primary)]">
@@ -595,9 +636,15 @@ export function WorkspacePage() {
                       onCheckedChange={(checked) =>
                         setPayload((current) => ({
                           ...current,
-                          mixed_port: checked ? current.mixed_port || defaultMixedPort : 0,
-                          socks_port: checked ? 0 : current.socks_port || defaultSocksPort,
-                          http_port: checked ? 0 : current.http_port || defaultHTTPPort,
+                          mixed_port: checked
+                            ? current.mixed_port || defaultMixedPort
+                            : 0,
+                          socks_port: checked
+                            ? 0
+                            : current.socks_port || defaultSocksPort,
+                          http_port: checked
+                            ? 0
+                            : current.http_port || defaultHTTPPort,
                         }))
                       }
                     />
@@ -606,13 +653,17 @@ export function WorkspacePage() {
                 </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {usesMixedPort ? (
-                    <ResourceField label="Mixed 端口" hint="该端口在工作台配置中必须唯一。">
+                    <ResourceField
+                      label="Mixed 端口"
+                      hint="该端口在工作台配置中必须唯一。"
+                    >
                       <ResourceInput
                         value={String(payload.mixed_port)}
                         onChange={(event) =>
                           setPayload((current) => ({
                             ...current,
-                            mixed_port: Number.parseInt(event.target.value, 10) || 0,
+                            mixed_port:
+                              Number.parseInt(event.target.value, 10) || 0,
                           }))
                         }
                         inputMode="numeric"
@@ -626,7 +677,8 @@ export function WorkspacePage() {
                           onChange={(event) =>
                             setPayload((current) => ({
                               ...current,
-                              socks_port: Number.parseInt(event.target.value, 10) || 0,
+                              socks_port:
+                                Number.parseInt(event.target.value, 10) || 0,
                             }))
                           }
                           inputMode="numeric"
@@ -638,7 +690,8 @@ export function WorkspacePage() {
                           onChange={(event) =>
                             setPayload((current) => ({
                               ...current,
-                              http_port: Number.parseInt(event.target.value, 10) || 0,
+                              http_port:
+                                Number.parseInt(event.target.value, 10) || 0,
                             }))
                           }
                           inputMode="numeric"
@@ -656,13 +709,23 @@ export function WorkspacePage() {
                       ...current,
                       proxy_settings: {
                         ...current.proxy_settings,
-                        strategy_type: event.target.value as PortProfileStrategy,
+                        strategy_type: event.target
+                          .value as PortProfileStrategy,
                       },
                     }))
                   }
                 >
-                  {(capability?.supported_strategies ?? ['select', 'url-test', 'fallback', 'load-balance']).map((strategy) => (
-                    <option key={strategy} value={strategy}>{strategy}</option>
+                  {(
+                    capability?.supported_strategies ?? [
+                      'select',
+                      'url-test',
+                      'fallback',
+                      'load-balance',
+                    ]
+                  ).map((strategy) => (
+                    <option key={strategy} value={strategy}>
+                      {strategy}
+                    </option>
                   ))}
                 </ResourceSelect>
               </ResourceField>
@@ -688,7 +751,8 @@ export function WorkspacePage() {
                       ...current,
                       proxy_settings: {
                         ...current.proxy_settings,
-                        test_interval_seconds: Number.parseInt(event.target.value, 10) || 0,
+                        test_interval_seconds:
+                          Number.parseInt(event.target.value, 10) || 0,
                       },
                     }))
                   }
@@ -697,7 +761,10 @@ export function WorkspacePage() {
               </ResourceField>
               {payload.proxy_settings.strategy_type === 'load-balance' ? (
                 <>
-                  <ResourceField label="负载均衡策略" hint="一致性哈希会尽量让相同顶级域名走同一节点，轮询会平均分配请求。">
+                  <ResourceField
+                    label="负载均衡策略"
+                    hint="一致性哈希会尽量让相同顶级域名走同一节点，轮询会平均分配请求。"
+                  >
                     <ResourceSelect
                       value={payload.proxy_settings.load_balance_strategy}
                       onChange={(event) =>
@@ -705,12 +772,15 @@ export function WorkspacePage() {
                           ...current,
                           proxy_settings: {
                             ...current.proxy_settings,
-                            load_balance_strategy: event.target.value as LoadBalanceStrategy,
+                            load_balance_strategy: event.target
+                              .value as LoadBalanceStrategy,
                           },
                         }))
                       }
                     >
-                      <option value="consistent-hashing">consistent-hashing</option>
+                      <option value="consistent-hashing">
+                        consistent-hashing
+                      </option>
                       <option value="round-robin">round-robin</option>
                     </ResourceSelect>
                   </ResourceField>
@@ -718,7 +788,9 @@ export function WorkspacePage() {
                     <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="space-y-1">
-                          <Label htmlFor="load-balance-lazy">延迟懒加载探测</Label>
+                          <Label htmlFor="load-balance-lazy">
+                            延迟懒加载探测
+                          </Label>
                           <p className="text-xs text-[var(--foreground-secondary)]">
                             只在需要时触发健康检查，减少空载时的探测请求。
                           </p>
@@ -741,14 +813,19 @@ export function WorkspacePage() {
                     <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="space-y-1">
-                          <Label htmlFor="load-balance-disable-udp">禁用 UDP</Label>
+                          <Label htmlFor="load-balance-disable-udp">
+                            禁用 UDP
+                          </Label>
                           <p className="text-xs text-[var(--foreground-secondary)]">
-                            为当前负载均衡组关闭 UDP 转发，适合只处理 TCP 的场景。
+                            为当前负载均衡组关闭 UDP 转发，适合只处理 TCP
+                            的场景。
                           </p>
                         </div>
                         <Switch
                           id="load-balance-disable-udp"
-                          checked={payload.proxy_settings.load_balance_disable_udp}
+                          checked={
+                            payload.proxy_settings.load_balance_disable_udp
+                          }
                           onCheckedChange={(checked) =>
                             setPayload((current) => ({
                               ...current,
@@ -812,8 +889,12 @@ export function WorkspacePage() {
                             proxy_settings: {
                               ...current.proxy_settings,
                               auth_enabled: checked,
-                              auth_username: checked ? current.proxy_settings.auth_username : '',
-                              auth_password: checked ? current.proxy_settings.auth_password : '',
+                              auth_username: checked
+                                ? current.proxy_settings.auth_username
+                                : '',
+                              auth_password: checked
+                                ? current.proxy_settings.auth_password
+                                : '',
                             },
                           }))
                         }
@@ -888,7 +969,9 @@ export function WorkspacePage() {
                       <input
                         type="checkbox"
                         checked={selectedNodeSet.has(node.id)}
-                        onChange={(event) => handleToggleNode(node.id, event.target.checked)}
+                        onChange={(event) =>
+                          handleToggleNode(node.id, event.target.checked)
+                        }
                         className="mt-1 h-4 w-4 rounded border-[var(--border-default)] accent-[var(--brand-primary)]"
                       />
                       <div className="min-w-0 space-y-1">
@@ -899,7 +982,9 @@ export function WorkspacePage() {
                           {node.type.toUpperCase()} · {node.server}:{node.port}
                         </p>
                         <p className="text-xs text-[var(--foreground-secondary)]">
-                          来源：{node.source_config_name} · 标签：{node.tags || '未设置'} · 最近状态：{node.last_test_status}
+                          来源：{node.source_config_name} · 标签：
+                          {node.tags || '未设置'} · 最近状态：
+                          {node.last_test_status}
                         </p>
                       </div>
                     </label>
@@ -917,8 +1002,8 @@ export function WorkspacePage() {
                 <PrimaryButton
                   type="button"
                   onClick={() => {
-                    setFeedback(null)
-                    saveRuntimeMutation.mutate(selectedProfileId)
+                    setFeedback(null);
+                    saveRuntimeMutation.mutate(selectedProfileId);
                   }}
                   disabled={saveRuntimeMutation.isPending}
                 >
@@ -940,12 +1025,18 @@ export function WorkspacePage() {
                       {preview.kernel_type}
                     </p>
                   </AppCard>
-                  <AppCard title="校验和" description="用于后续比较片段内容是否变化。">
-                    <p className="break-all text-xs text-[var(--foreground-primary)]">
+                  <AppCard
+                    title="校验和"
+                    description="用于后续比较片段内容是否变化。"
+                  >
+                    <p className="text-xs break-all text-[var(--foreground-primary)]">
                       {preview.checksum}
                     </p>
                   </AppCard>
-                  <AppCard title="选中节点" description="本次参与片段渲染的节点数量。">
+                  <AppCard
+                    title="选中节点"
+                    description="本次参与片段渲染的节点数量。"
+                  >
                     <p className="text-sm font-semibold text-[var(--foreground-primary)]">
                       {preview.node_ids.length}
                     </p>
@@ -960,5 +1051,5 @@ export function WorkspacePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,10 +1,24 @@
 package model
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"log/slog"
 	"poolx/internal/pkg/common"
 	"strconv"
 	"strings"
+	"sync"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+const clashSecretByteLength = 32
+
+var optionUpdateMu sync.Mutex
+var ensureClashSecretMu sync.Mutex
 
 type Option struct {
 	Key   string `json:"key" gorm:"primaryKey"`
@@ -72,31 +86,54 @@ func InitOptionMap() {
 	common.OptionMap["CriticalRateLimitNum"] = strconv.Itoa(common.CriticalRateLimitNum)
 	common.OptionMap["CriticalRateLimitDuration"] = strconv.FormatInt(common.CriticalRateLimitDuration, 10)
 	common.OptionMapRWMutex.Unlock()
-	options, _ := AllOption()
-	for _, option := range options {
-		updateOptionMap(option.Key, option.Value)
+	options, err := AllOption()
+	if err != nil {
+		slog.Error("load options failed", "error", err)
+	} else {
+		for _, option := range options {
+			updateOptionMap(option.Key, option.Value)
+		}
+	}
+
+	secret, err := EnsureClashSecret()
+	if err != nil {
+		// Keep the effective runtime secret random even if persistence is temporarily unavailable.
+		if secret != "" {
+			updateOptionMap("ClashSecret", secret)
+		}
+		slog.Error("initialize random ClashSecret failed", "error", err)
 	}
 }
 
 func UpdateOption(key string, value string) error {
-	// Save to database first
-	option := Option{
-		Key: key,
+	optionUpdateMu.Lock()
+	defer optionUpdateMu.Unlock()
+
+	if DB == nil {
+		return fmt.Errorf("persist option %q: database is not initialized", key)
 	}
-	// https://gorm.io/docs/update.html#Save-All-Fields
-	DB.FirstOrCreate(&option, Option{Key: key})
-	option.Value = value
-	// Save is a combination function.
-	// If save value does not contain primary key, it will execute Create,
-	// otherwise it will execute Update (with all fields).
-	DB.Save(&option)
-	// Update OptionMap
-	updateOptionMap(key, value)
+
+	common.OptionMapRWMutex.Lock()
+	defer common.OptionMapRWMutex.Unlock()
+
+	option := Option{Key: key, Value: value}
+	if err := DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "key"}},
+		DoUpdates: clause.AssignmentColumns([]string{"value"}),
+	}).Create(&option).Error; err != nil {
+		return fmt.Errorf("persist option %q: %w", key, err)
+	}
+	updateOptionMapLocked(key, value)
 	return nil
 }
 
 func updateOptionMap(key string, value string) {
 	common.OptionMapRWMutex.Lock()
+	defer common.OptionMapRWMutex.Unlock()
+	updateOptionMapLocked(key, value)
+}
+
+func updateOptionMapLocked(key string, value string) {
 	if common.OptionMap == nil {
 		common.OptionMap = make(map[string]string)
 	}
@@ -240,5 +277,49 @@ func updateOptionMap(key string, value string) {
 			common.CriticalRateLimitDuration = v
 		}
 	}
-	common.OptionMapRWMutex.Unlock()
+}
+
+// EnsureClashSecret rotates the legacy public default and persists one random
+// controller secret shared by Runtime and the Zashboard proxy.
+func EnsureClashSecret() (string, error) {
+	ensureClashSecretMu.Lock()
+	defer ensureClashSecretMu.Unlock()
+
+	common.OptionMapRWMutex.RLock()
+	current := strings.TrimSpace(common.ClashSecret)
+	common.OptionMapRWMutex.RUnlock()
+	if current != "" && current != common.DefaultClashSecret {
+		if DB == nil {
+			return current, fmt.Errorf("persist ClashSecret: database is not initialized")
+		}
+		var stored Option
+		err := DB.First(&stored, "key = ?", "ClashSecret").Error
+		switch {
+		case err == nil && strings.TrimSpace(stored.Value) == current:
+			return current, nil
+		case err != nil && !errors.Is(err, gorm.ErrRecordNotFound):
+			return current, fmt.Errorf("load ClashSecret: %w", err)
+		}
+		if err := UpdateOption("ClashSecret", current); err != nil {
+			return current, err
+		}
+		return current, nil
+	}
+
+	secret, err := generateClashSecret()
+	if err != nil {
+		return "", err
+	}
+	if err := UpdateOption("ClashSecret", secret); err != nil {
+		return secret, err
+	}
+	return secret, nil
+}
+
+func generateClashSecret() (string, error) {
+	buffer := make([]byte, clashSecretByteLength)
+	if _, err := rand.Read(buffer); err != nil {
+		return "", fmt.Errorf("generate ClashSecret: %w", err)
+	}
+	return hex.EncodeToString(buffer), nil
 }

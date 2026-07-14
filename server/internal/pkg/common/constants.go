@@ -10,7 +10,7 @@ import (
 var StartTime = time.Now().Unix() // unit: second
 var Version = "dev"               // release builds inject the tag version via ldflags
 
-const DefaultServerUpdateRepo = "Rain-kl/PoolX"
+const DefaultServerUpdateRepo = "Qalxry/PoolNeXt"
 const DefaultKernelType = "mihomo"
 const DefaultMihomoReleaseRepo = "MetaCubeX/mihomo"
 const DefaultNodeTestURL = "https://cp.cloudflare.com/generate_204"
@@ -19,7 +19,7 @@ const DefaultClashExternalController = "127.0.0.1:19090"
 const DefaultClashMode = "rule"
 const DefaultClashSecret = "3ebc195c9fbe81c01eb9299e3c6bf644"
 
-var SystemName = "PoolX"
+var SystemName = "PoolNeXt"
 var ServerAddress = "http://localhost:3000"
 var ServerUpdateRepo = DefaultServerUpdateRepo
 var KernelType = DefaultKernelType

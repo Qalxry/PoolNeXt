@@ -1,16 +1,16 @@
-# PoolX 部署说明
+# PoolNeXt 部署说明
 
-本文档描述 `PoolX` 当前阶段的部署基线、启动方式和最小验证步骤。
+本文档描述 `PoolNeXt` 当前阶段的部署基线、启动方式和最小验证步骤。
 
-当前文档只描述 PoolX 服务端与前端的部署，不包含 Agent、节点联调或 OpenResty 配置分发链路。
+当前文档只描述 PoolNeXt 服务端与前端的部署，不包含远程 Agent 或多实例集群。
 
 ## 1. 前置条件
 
 ### 1.1 Server
 
-* Go 1.24+
-* Node.js 18+
-* pnpm
+* Go 1.24.13（发布与可重复构建使用该精确版本）
+* Node.js 20.19.5
+* 由各前端 `package.json` 固定版本的 pnpm（通过 Corepack 启用）
 * 可写 SQLite 文件目录，或可访问的 PostgreSQL 实例
 
 ## 2. 启动方式
@@ -18,22 +18,11 @@
 ### 2.1 构建前端静态产物
 
 ```bash
-cd server/web
-corepack enable
-pnpm install
-pnpm build
+make deps
+make build
 ```
 
-`pnpm build` 会生成供 Go Server 托管的管理端静态产物。
-
-如需内置 Clash 控制台 `zashboard`，还需要构建一次它的静态资源：
-
-```bash
-cd server/zashboard
-corepack enable
-pnpm install
-pnpm build
-```
+`make build` 会以无远程字体模式构建两个前端，并生成带 `embedassets` 的 `dist/poolnext-server`。
 
 构建完成后，Go Server 会托管：
 
@@ -42,42 +31,58 @@ pnpm build
 
 ### 2.2 源码启动
 
-推荐使用 `cmd/server` 入口启动：
+项目只有一个正式服务入口：`server/main.go`。`make run` 会先重建两个前端，再以 `embedassets` 构建标签启动该入口，开发、发布和容器不会再走不同的静态资源契约。
 
 ```bash
-cd server
-export SESSION_SECRET='replace-with-random-string'
-export SQLITE_PATH='./poolx.db'
+export SESSION_SECRET="$(openssl rand -hex 32)"
+export SQLITE_PATH="$PWD/server/poolnext.db"
+export POOLNEXT_BOOTSTRAP_FILE="$PWD/server/poolnext-bootstrap.txt"
 export LOG_LEVEL='info'
 # 可选：使用 PostgreSQL
 # export SQL_DSN='postgres://template:secret@127.0.0.1:5432/poolx?sslmode=disable'
-go run ./cmd/server
+make run
 ```
 
-如需使用嵌入式静态资源方式，也可直接执行：
+也可以显式执行同一入口：
 
 ```bash
+make build-assets
 cd server
-go run .
+go run -tags embedassets -trimpath -buildvcs=false .
 ```
 
 默认监听 `3000` 端口。
 
-如果使用 `go run .` 的嵌入式静态资源入口，启动前需要先完成 `server/web` 和 `server/zashboard` 的构建。
+缺失任一前端产物时，`embedassets` 编译会直接失败。旧的 `server/cmd/server` 重复入口已删除，避免 fresh checkout 在运行期才因找不到磁盘资产而崩溃。
 
 ### 2.3 Docker Compose 启动
 
-可参考 `server/docker-compose.yaml`：
+先准备密钥。Compose 把 PostgreSQL 原始密码和 DSN 中的 URL 编码密码分开，避免 `/`、`?`、`#`、`%` 等字符破坏连接串。十六进制随机密码不需要额外编码：
+
+```bash
+export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+export POSTGRES_PASSWORD_URLENCODED="$POSTGRES_PASSWORD"
+export SESSION_SECRET="$(openssl rand -hex 32)"
+```
+
+若使用任意字符密码，必须生成对应的 URL 编码值：
+
+```bash
+export POSTGRES_PASSWORD='your raw password'
+export POSTGRES_PASSWORD_URLENCODED="$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_PASSWORD"], safe=""))')"
+```
+
+`server/docker-compose.yaml` 使用固定镜像 digest、非 root UID `10001`、只读根文件系统、`cap_drop: ALL`、`no-new-privileges`、有界 `/tmp` 和镜像健康检查。等价的核心配置如下：
 
 ```yaml
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     restart: unless-stopped
     environment:
       POSTGRES_DB: poolx
       POSTGRES_USER: poolx
-      POSTGRES_PASSWORD: replace-with-strong-password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请先设置 POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -86,9 +91,9 @@ services:
       timeout: 5s
       retries: 5
 
-  poolx:
-    image: ghcr.io/rain-kl/poolx:latest
-    container_name: poolx
+  poolnext:
+    image: ghcr.io/qalxry/poolnext:latest
+    container_name: poolnext
     restart: unless-stopped
     depends_on:
       postgres:
@@ -96,17 +101,24 @@ services:
     ports:
       - "3000:3000"
     environment:
-      SESSION_SECRET: replace-with-random-string
-      SQLITE_PATH: /data/poolx.db
-      SQL_DSN: postgres://poolx:replace-with-strong-password@postgres:5432/poolx?sslmode=disable
+      SESSION_SECRET: ${SESSION_SECRET:?请先设置高强度 SESSION_SECRET}
+      POOLNEXT_BOOTSTRAP_FILE: /data/poolnext-bootstrap.txt
+      SQLITE_PATH: /data/poolnext.db
+      SQL_DSN: postgres://poolx:${POSTGRES_PASSWORD_URLENCODED:?请设置 URL 编码后的数据库密码}@postgres:5432/poolx?sslmode=disable
       GIN_MODE: release
       LOG_LEVEL: info
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     volumes:
-      - poolx-data:/data
+      - poolnext-data:/data
 
 volumes:
   postgres-data:
-  poolx-data:
+  poolnext-data:
 ```
 
 启动：
@@ -116,22 +128,24 @@ cd server
 docker compose up -d
 ```
 
+默认使用命名卷，首次挂载时会继承镜像内 `/data` 的 UID/GID。若改成宿主机 bind mount，需先执行 `chown -R 10001:10001 <数据目录>`，否则非 root 进程无法创建数据库、上传目录和 bootstrap 文件。
+
 ## 3. 首次登录
 
 访问 `http://localhost:3000`
 
-默认账号：
+初始账号：
 
 * 用户名：`root`
-* 密码：`123456`
+* 密码：读取 `/data/poolnext-bootstrap.txt`（本地 SQLite 部署则读取数据库旁的同名文件）
 
-首次部署后应尽快修改默认密码，并配置正式的 `SESSION_SECRET`。
+该文件权限为 `0600`，首次修改密码后自动删除。生产模式在数据库初始化前拒绝缺失、弱值或占位值 `SESSION_SECRET`。
 
 如需打开内置 Clash 控制台，可在运行状态页点击“打开 Clash 控制台”，或直接访问：
 
 `http://localhost:3000/zashboard/`
 
-该界面会通过 PoolX 服务端同源反代连接 Mihomo external-controller，继续复用管理端登录态，不需要在浏览器中填写 `secret` 或直连本机 Clash API。
+该界面会通过 PoolNeXt 服务端的受限同源代理连接 Mihomo controller，继续复用管理端登录态，不需要在浏览器中填写 `secret`。升级、重启、配置替换和 GEO/UI 更新等危险 controller 路由不会开放。
 
 ## 4. Swagger
 
@@ -169,24 +183,33 @@ pnpm dev
 
 ## 7. 升级说明
 
-当前 PoolX 保留服务端升级能力：
+当前 PoolNeXt 保留服务端升级能力：
 
 * 检查最新版本
 * 上传服务端二进制进行手动升级
 * 执行服务端升级流程
 
-默认升级仓库为 `Rain-kl/PoolX`，可在系统设置中通过 `ServerUpdateRepo` 改为自己的 GitHub 发布仓库，格式为 `owner/repo`。
+默认升级仓库为 `Qalxry/PoolNeXt`，可在系统设置中通过 `ServerUpdateRepo` 改为自己的 GitHub 发布仓库，格式为 `owner/repo`。
 
 当前系统设置还支持配置代理内核：
 
 * 当前仅开放 `mihomo`
-* 可填写 Mihomo 二进制目标路径
-* 可通过手动上传或从官方仓库自动下载适配当前平台的发行版完成安装
+* “现有路径检查”会把二进制登记为 `external_immutable`，禁止覆盖、升级、删除、移动或改权
+* 手动上传和官方下载只允许写入 managed 路径，不能覆盖已登记的外部不可变文件
 * 安装完成后会立即执行版本校验，并写回运行时配置
 
 当前文档不描述 Agent 升级、节点升级或 OpenResty 重载。
 
 ## 8. 常用验证命令
+
+```bash
+# 快速只读质量门
+make quality
+
+# 完整本地 CI：shuffle/race/coverage、Swagger、可重复构建、
+# desktop/mobile Chromium、容器权限与跨通道一致性
+make ci
+```
 
 ### 8.1 Server
 

@@ -16,8 +16,8 @@ definitions:
     type: object
 info:
   contact: {}
-  description: PoolX Server API documentation.
-  title: PoolX Server API
+  description: PoolNeXt Server API documentation.
+  title: PoolNeXt Server API
   version: "3.0"
 paths:
   /api/capabilities:
@@ -45,8 +45,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Download latest official Mihomo binary for current platform and verify
-        version
+      summary: Download the latest official Mihomo binary into managed storage and
+        verify its version
       tags:
       - Kernel
   /api/kernel/mihomo/inspect:
@@ -61,7 +61,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Inspect existing Mihomo binary path and verify version
+      summary: Register an existing Mihomo binary as external immutable and verify
+        its version
       tags:
       - Kernel
   /api/kernel/mihomo/upload:
@@ -76,7 +77,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Upload Mihomo binary, install it to target path and verify version
+      summary: Upload a managed Mihomo binary, install it to target path and verify
+        version
       tags:
       - Kernel
   /api/option/:

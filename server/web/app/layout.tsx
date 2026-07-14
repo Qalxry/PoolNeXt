@@ -9,11 +9,11 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'PoolX 控制台',
-    template: '%s | PoolX',
+    default: 'PoolNeXt 控制台',
+    template: '%s | PoolNeXt',
   },
-  description: 'PoolX 代理池控制台',
-  applicationName: 'PoolX',
+  description: 'PoolNeXt 代理池控制台',
+  applicationName: 'PoolNeXt',
 };
 
 interface RootLayoutProps {
@@ -22,9 +22,9 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang='zh-CN' suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       <body>
-        <Script id='theme-init' strategy='beforeInteractive'>
+        <Script id="theme-init" strategy="beforeInteractive">
           {getThemeInitScript()}
         </Script>
         <AppProviders>{children}</AppProviders>

@@ -4,7 +4,7 @@
 
 <div align="center">
 
-# PoolX
+# PoolNeXt
 
 A proxy pool control panel built with Gin and Next.js. Its core goal is to organize Clash/Mihomo nodes into reusable proxy pools for web scraping, data collection, proxy requests, and automated outbound network scenarios.
 
@@ -17,7 +17,7 @@ A proxy pool control panel built with Gin and Next.js. Its core goal is to organ
 > This project is only a proxy pool control panel and does NOT provide nodes or methods to obtain them. It is intended for learning, research, and technical exchange only. Any illegal use is strictly prohibited.
 
 > [!WARNING]
-> After logging in with the root account for the first time, be sure to change the default password `123456` immediately!
+> On first startup, PoolNeXt writes a random one-time root password to `poolnext-bootstrap.txt` beside the SQLite database (or to `POOLNEXT_BOOTSTRAP_FILE`). Read it locally, sign in, and change the password immediately; the file is then removed.
 
 ---
 
@@ -68,7 +68,7 @@ This project provides a clean and user-friendly UI for efficiently managing and 
 
 Login URL: `http://IP:3000/`  
 Username: `root`  
-Password: `123456`
+Password: read the one-time value from `/data/poolnext-bootstrap.txt` in Docker, or from `poolnext-bootstrap.txt` beside the SQLite database.
 
 ### Docker Deployment
 
@@ -80,7 +80,7 @@ services:
     environment:
       POSTGRES_DB: poolx
       POSTGRES_USER: poolx
-      POSTGRES_PASSWORD: replace-with-strong-password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -89,8 +89,8 @@ services:
       timeout: 5s
       retries: 5
 
-  poolx:
-    image: ghcr.io/rain-kl/poolx:latest
+  poolnext:
+    image: ghcr.io/qalxry/poolnext:latest
     restart: unless-stopped
     depends_on:
       postgres:
@@ -99,11 +99,12 @@ services:
       - "3000:3000"
 #     Expose proxy listening ports as needed
     environment:
-      SESSION_SECRET: replace-with-random-string
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET to a strong random value}
+      POOLNEXT_BOOTSTRAP_FILE: /data/poolnext-bootstrap.txt
 #     If SQL_DSN is specified, the following will be ignored
       SQLITE_PATH: /data/poolx.db
 #     To use SQLite, comment out SQL_DSN and remove postgres service
-      SQL_DSN: postgres://poolx:replace-with-strong-password@postgres:5432/poolx?sslmode=disable
+      SQL_DSN: postgres://poolx:${POSTGRES_PASSWORD}@postgres:5432/poolx?sslmode=disable
       GIN_MODE: release
       LOG_LEVEL: info
 
@@ -117,21 +118,23 @@ Download the precompiled binary from the Release page:
 
 ```bash
 # Start with SQLite
-SESSION_SECRET=replace-with-random-string \
+SESSION_SECRET="$(openssl rand -hex 32)" \
 SQLITE_PATH=/path/to/poolx.db \
-./poolx
+./poolnext-server
 ```
 
 Access URL: http://localhost:3000
 
-Default credentials:
-* Username: root
-* Password: 123456
+Initial credentials:
+* Username: `root`
+* Password: the random one-time value in `/path/to/poolnext-bootstrap.txt`
+
+The bootstrap file is mode `0600` and is removed after the first password change. Production startup rejects missing, weak, or placeholder `SESSION_SECRET` values.
 
 
 ## Configuration
 
-PoolX does not require maintaining a fixed configuration file manually.
+PoolNeXt does not require maintaining a fixed configuration file manually.
 
 Its core workflow is:
 * Import nodes
@@ -146,4 +149,6 @@ For runtime parameters, deployment methods, and system configuration, refer to:
 
 ## License
 
-This project is licensed under the [Apache License 2.0](./LICENSE) ￼.
+PoolNeXt is maintained at [Qalxry/PoolNeXt](https://github.com/Qalxry/PoolNeXt). It is a fork of the discontinued [Rain-kl/PoolX](https://github.com/Rain-kl/PoolX) project; that link is retained for historical attribution only. PoolNeXt releases, issues, container images, and automatic updates use the Qalxry repository.
+
+This project is licensed under the [Apache License 2.0](./LICENSE). Third-party notices, including the bundled Zashboard MIT notice, are recorded in [NOTICE](./NOTICE).

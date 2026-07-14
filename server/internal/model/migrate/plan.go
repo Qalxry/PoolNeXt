@@ -2,7 +2,7 @@ package migrate
 
 import "gorm.io/gorm"
 
-// BuildTemplateScheduler assembles the PoolX schema migration plan.
+// BuildTemplateScheduler assembles the PoolNeXt schema migration plan.
 // The release baseline starts from schema V1 and does not keep historical
 // upgrade chains from pre-release databases.
 func BuildTemplateScheduler(
@@ -24,5 +24,6 @@ func BuildTemplateScheduler(
 	).
 		RegisterInitializer(V0(hooks)).
 		RegisterMigration(V1(hooks)).
-		RegisterMigration(V2(hooks))
+		RegisterMigration(V2(hooks)).
+		RegisterMigration(V3(hooks))
 }

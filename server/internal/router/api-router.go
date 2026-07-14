@@ -19,8 +19,8 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.POST("/user/reset", middleware.CriticalRateLimit(), controller.ResetPassword)
 		apiRouter.GET("/oauth/github", middleware.CriticalRateLimit(), controller.GitHubOAuth)
 		apiRouter.GET("/oauth/wechat", middleware.CriticalRateLimit(), controller.WeChatAuth)
-		apiRouter.GET("/oauth/wechat/bind", middleware.CriticalRateLimit(), middleware.UserAuth(), controller.WeChatBind)
-		apiRouter.GET("/oauth/email/bind", middleware.CriticalRateLimit(), middleware.UserAuth(), controller.EmailBind)
+		apiRouter.POST("/oauth/wechat/bind", middleware.CriticalRateLimit(), middleware.UserAuth(), middleware.NoTokenAuth(), controller.WeChatBindSecure)
+		apiRouter.POST("/oauth/email/bind", middleware.CriticalRateLimit(), middleware.UserAuth(), middleware.NoTokenAuth(), controller.EmailBind)
 
 		userRoute := apiRouter.Group("/user")
 		{
@@ -134,7 +134,9 @@ func SetApiRouter(router *gin.Engine) {
 		zashboardRoute := apiRouter.Group("/zashboard")
 		zashboardRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
 		{
-			zashboardRoute.Any("/clash/*path", controller.ProxyZashboardClash)
+			zashboardRoute.GET("/clash/*path", controller.ProxyZashboardClash)
+			zashboardRoute.PUT("/clash/*path", controller.ProxyZashboardClash)
+			zashboardRoute.DELETE("/clash/*path", controller.ProxyZashboardClash)
 		}
 		logRoute := apiRouter.Group("/log")
 		logRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())

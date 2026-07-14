@@ -505,7 +505,7 @@ func TestFetchYAMLReturnsExpectedMetadataAndHeadersOnSuccess(t *testing.T) {
 	if acceptHeader != "application/x-yaml,text/yaml,text/plain,*/*" {
 		t.Fatalf("expected Accept header to be set, got %q", acceptHeader)
 	}
-	if userAgent != "PoolX-Server" {
-		t.Fatalf("expected User-Agent header PoolX-Server, got %q", userAgent)
+	if userAgent != "PoolNeXt-Server" {
+		t.Fatalf("expected User-Agent header PoolNeXt-Server, got %q", userAgent)
 	}
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mihomo"
+  short_description: "Offline Mihomo repo docs"
+  default_prompt: "Use $docs-mihomo to answer questions from the offline repository documentation."

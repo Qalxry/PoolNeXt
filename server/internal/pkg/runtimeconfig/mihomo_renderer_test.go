@@ -48,6 +48,27 @@ func TestRenderMihomoConfigBuildsMergeableFragment(t *testing.T) {
 	}
 }
 
+func TestRenderMihomoConfigUsesPoolNeXtFallbackGroupName(t *testing.T) {
+	result, err := RenderMihomoConfig(MihomoRenderInput{
+		Profile: model.PortProfile{
+			ListenHost: "127.0.0.1",
+			MixedPort:  7890,
+		},
+		Nodes: []*model.ProxyNode{
+			{
+				Name:         "fallback-node",
+				MetadataJSON: `{"type":"ss","server":"1.1.1.1","port":443,"cipher":"aes-128-gcm","password":"secret"}`,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("RenderMihomoConfig returned error: %v", err)
+	}
+	if !strings.Contains(result.Content, "group_name: PoolNeXt") {
+		t.Fatalf("expected PoolNeXt fallback group name, got: %s", result.Content)
+	}
+}
+
 func TestRenderMihomoConfigIncludesLoadBalanceOptions(t *testing.T) {
 	result, err := RenderMihomoConfig(MihomoRenderInput{
 		Profile: model.PortProfile{

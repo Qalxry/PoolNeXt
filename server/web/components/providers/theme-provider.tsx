@@ -93,7 +93,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     [resolvedTheme, setThemeMode, themeMode],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

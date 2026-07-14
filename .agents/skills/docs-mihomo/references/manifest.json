@@ -1,0 +1,51 @@
+{
+  "generator": "skillgen-repo",
+  "generator_version": "0.1.0",
+  "generated_at": "2026-07-13T18:03:34.676889+00:00",
+  "repo_source": "/media/takagisan/Storage/Project/OpenSource/PoolNeXt/ref_repos/mihomo",
+  "repo_root": "/media/takagisan/Storage/Project/OpenSource/PoolNeXt/ref_repos/mihomo",
+  "git": {
+    "remote": "https://github.com/MetaCubeX/mihomo.git",
+    "commit": "a84724665eb7f989809abe463c05f5723bd24975",
+    "branch": null
+  },
+  "classification": {
+    "kind": "sparse-docs",
+    "confidence": "medium",
+    "has_llms": false,
+    "doc_count": 4,
+    "example_count": 0,
+    "test_count": 112
+  },
+  "doc_site": {
+    "frameworks": [],
+    "evidence": [],
+    "build_hints": [],
+    "markdown_files": 4,
+    "mdx_files": 0,
+    "requires_build_confirmation": false
+  },
+  "limits": {
+    "max_files": 10000,
+    "max_doc_files": 250,
+    "max_doc_bytes": 300000,
+    "max_source_files": 80,
+    "max_source_bytes": 120000
+  },
+  "counts": {
+    "source_map_entries": 97,
+    "original": 3,
+    "source": 87,
+    "inferred": 7
+  },
+  "postprocessing": {
+    "status": "completed",
+    "manual_source_capsules": 7,
+    "authored_inferred_pages": 7,
+    "source_commit_verified": "a84724665eb7f989809abe463c05f5723bd24975"
+  },
+  "warnings": [
+    "Source evidence candidates truncated at 80 files.",
+    "Seven focused source capsules were added after generation; the skill is still not full-source coverage."
+  ]
+}

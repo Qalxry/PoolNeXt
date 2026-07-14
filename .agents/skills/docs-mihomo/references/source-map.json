@@ -1,0 +1,778 @@
+[
+  {
+    "generated_path": "references/original/readme.md",
+    "original_path": "README.md",
+    "kind": "original",
+    "transform": "copied",
+    "bytes": 3232,
+    "reason": "root documentation file"
+  },
+  {
+    "generated_path": "references/original/test/readme.md",
+    "original_path": "test/README.md",
+    "kind": "original",
+    "transform": "copied",
+    "bytes": 942,
+    "reason": "package readme"
+  },
+  {
+    "generated_path": "references/original/transport/shadowsocks/readme.md",
+    "original_path": "transport/shadowsocks/README.md",
+    "kind": "original",
+    "transform": "copied",
+    "bytes": 189,
+    "reason": "package readme"
+  },
+  {
+    "generated_path": "references/source/dockerfile.md",
+    "original_path": "Dockerfile",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1268,
+    "reason": "project configuration"
+  },
+  {
+    "generated_path": "references/source/makefile.md",
+    "original_path": "Makefile",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 5384,
+    "reason": "project configuration"
+  },
+  {
+    "generated_path": "references/source/go.md",
+    "original_path": "go.mod",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 5615,
+    "reason": "project configuration"
+  },
+  {
+    "generated_path": "references/source/test/makefile.md",
+    "original_path": "test/Makefile",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 264,
+    "reason": "project configuration"
+  },
+  {
+    "generated_path": "references/source/test/go.md",
+    "original_path": "test/go.mod",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 6544,
+    "reason": "project configuration"
+  },
+  {
+    "generated_path": "references/source/component/geodata/router/config.md",
+    "original_path": "component/geodata/router/config.proto",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1556,
+    "reason": "schema or protocol definition"
+  },
+  {
+    "generated_path": "references/source/transport/vless/config.md",
+    "original_path": "transport/vless/config.proto",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 464,
+    "reason": "schema or protocol definition"
+  },
+  {
+    "generated_path": "references/source/dns/server.md",
+    "original_path": "dns/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2429,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/hub/route/server.md",
+    "original_path": "hub/route/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 13723,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/anytls/server.md",
+    "original_path": "listener/anytls/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 5147,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/http/server.md",
+    "original_path": "listener/http/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 4018,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/mieru/server.md",
+    "original_path": "listener/mieru/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 3159,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/sing-hysteria2/server.md",
+    "original_path": "listener/sing_hysteria2/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 6861,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/sing-shadowsocks/server.md",
+    "original_path": "listener/sing_shadowsocks/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 7746,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/sing-tun/server.md",
+    "original_path": "listener/sing_tun/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 21843,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/sing-vless/server.md",
+    "original_path": "listener/sing_vless/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 8166,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/sing-vmess/server.md",
+    "original_path": "listener/sing_vmess/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 6183,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/sudoku/server.md",
+    "original_path": "listener/sudoku/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 8100,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/trojan/server.md",
+    "original_path": "listener/trojan/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 8239,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/trusttunnel/server.md",
+    "original_path": "listener/trusttunnel/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 4672,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/listener/tuic/server.md",
+    "original_path": "listener/tuic/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 6546,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/main.md",
+    "original_path": "main.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 6597,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/transport/gun/server.md",
+    "original_path": "transport/gun/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2928,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/transport/kcptun/server.md",
+    "original_path": "transport/kcptun/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1984,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/transport/tuic/server.md",
+    "original_path": "transport/tuic/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 5630,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/transport/tuic/v4/server.md",
+    "original_path": "transport/tuic/v4/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 5125,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/transport/tuic/v5/server.md",
+    "original_path": "transport/tuic/v5/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 5523,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/transport/vless/encryption/server.md",
+    "original_path": "transport/vless/encryption/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 10225,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/transport/xhttp/server.md",
+    "original_path": "transport/xhttp/server.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 13226,
+    "reason": "entry point candidate"
+  },
+  {
+    "generated_path": "references/source/common/cmd/cmd.md",
+    "original_path": "common/cmd/cmd.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1158,
+    "reason": "implementation candidate"
+  },
+  {
+    "generated_path": "references/source/common/cmd/cmd-other.md",
+    "original_path": "common/cmd/cmd_other.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 238,
+    "reason": "implementation candidate"
+  },
+  {
+    "generated_path": "references/source/common/cmd/cmd-test.md",
+    "original_path": "common/cmd/cmd_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 943,
+    "reason": "implementation candidate"
+  },
+  {
+    "generated_path": "references/source/common/cmd/cmd-windows.md",
+    "original_path": "common/cmd/cmd_windows.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 309,
+    "reason": "implementation candidate"
+  },
+  {
+    "generated_path": "references/source/test/clash-test.md",
+    "original_path": "test/clash_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 13182,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/dns-test.md",
+    "original_path": "test/dns_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2124,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/docker-test.md",
+    "original_path": "test/docker_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1406,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/hysteria-test.md",
+    "original_path": "test/hysteria_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1370,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/snell-test.md",
+    "original_path": "test/snell_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 3991,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/ss-test.md",
+    "original_path": "test/ss_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 7375,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/trojan-test.md",
+    "original_path": "test/trojan_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 5316,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/util.md",
+    "original_path": "test/util.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 948,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/util-darwin-test.md",
+    "original_path": "test/util_darwin_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1541,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/util-other-test.md",
+    "original_path": "test/util_other_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 281,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/vless-test.md",
+    "original_path": "test/vless_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 3556,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/test/vmess-test.md",
+    "original_path": "test/vmess_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 11534,
+    "reason": "test code"
+  },
+  {
+    "generated_path": "references/source/adapter/outbound/mieru-test.md",
+    "original_path": "adapter/outbound/mieru_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2339,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/arc/arc-test.md",
+    "original_path": "common/arc/arc_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 3053,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/atomic/value-test.md",
+    "original_path": "common/atomic/value_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 4753,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/batch/batch-test.md",
+    "original_path": "common/batch/batch_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1785,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/contextutils/afterfunc-test.md",
+    "original_path": "common/contextutils/afterfunc_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2595,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/convert/converter-test.md",
+    "original_path": "common/convert/converter_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 5735,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/lru/lrucache-test.md",
+    "original_path": "common/lru/lrucache_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 3826,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/maphash/maphash-test.md",
+    "original_path": "common/maphash/maphash_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 12515,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/net/context-test.md",
+    "original_path": "common/net/context_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2205,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/observable/observable-test.md",
+    "original_path": "common/observable/observable_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2858,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/orderedmap/json-fuzz-test.md",
+    "original_path": "common/orderedmap/json_fuzz_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 3990,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/orderedmap/json-test.md",
+    "original_path": "common/orderedmap/json_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 8912,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/orderedmap/orderedmap-test.md",
+    "original_path": "common/orderedmap/orderedmap_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 8878,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/orderedmap/utils-test.md",
+    "original_path": "common/orderedmap/utils_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2388,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/orderedmap/yaml-fuzz-test.md",
+    "original_path": "common/orderedmap/yaml_fuzz_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2606,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/orderedmap/yaml-test.md",
+    "original_path": "common/orderedmap/yaml_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 7524,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/picker/picker-test.md",
+    "original_path": "common/picker/picker_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1084,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/pool/alloc-test.md",
+    "original_path": "common/pool/alloc_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1578,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/queue/queue-test.md",
+    "original_path": "common/queue/queue_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 6701,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/singledo/singledo-test.md",
+    "original_path": "common/singledo/singledo_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1363,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/structure/structure-test.md",
+    "original_path": "common/structure/structure_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 7370,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/utils/ranges-test.md",
+    "original_path": "common/utils/ranges_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1757,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/utils/uuid-test.md",
+    "original_path": "common/utils/uuid_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1625,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/xsync/map-extra-test.md",
+    "original_path": "common/xsync/map_extra_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1089,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/common/xsync/map-test.md",
+    "original_path": "common/xsync/map_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 46564,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/ca/fingerprint-test.md",
+    "original_path": "component/ca/fingerprint_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 24005,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/cidr/ipcidr-set-test.md",
+    "original_path": "component/cidr/ipcidr_set_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2204,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/ech/key-test.md",
+    "original_path": "component/ech/key_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 797,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/fakeip/pool-test.md",
+    "original_path": "component/fakeip/pool_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 7356,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/fakeip/skipper-test.md",
+    "original_path": "component/fakeip/skipper_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1124,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/memory/memory-test.md",
+    "original_path": "component/memory/memory_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 656,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/pool/pool-test.md",
+    "original_path": "component/pool/pool_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1265,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/sniffer/sniff-test.md",
+    "original_path": "component/sniffer/sniff_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 47399,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/trie/domain-set-test.md",
+    "original_path": "component/trie/domain_set_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 2796,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/component/trie/domain-test.md",
+    "original_path": "component/trie/domain_test.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 3499,
+    "reason": "test evidence"
+  },
+  {
+    "generated_path": "references/source/config/config-core.md",
+    "original_path": "config/config.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 4315,
+    "reason": "focused configuration model, defaults, and parse-pipeline evidence added after generation"
+  },
+  {
+    "generated_path": "references/source/docs/config-example.md",
+    "original_path": "docs/config.yaml",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1437,
+    "reason": "focused excerpts from the repository configuration example"
+  },
+  {
+    "generated_path": "references/source/hub/application-flow.md",
+    "original_path": "hub/hub.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 912,
+    "reason": "focused hub parse, CLI override, and controller application evidence"
+  },
+  {
+    "generated_path": "references/source/hub/executor/application-flow.md",
+    "original_path": "hub/executor/executor.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1161,
+    "reason": "focused ordered runtime subsystem update evidence"
+  },
+  {
+    "generated_path": "references/source/tunnel/routing-flow.md",
+    "original_path": "tunnel/tunnel.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 1857,
+    "reason": "focused metadata, matching, and outbound routing evidence"
+  },
+  {
+    "generated_path": "references/source/rules/parser.md",
+    "original_path": "rules/parser.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 858,
+    "reason": "focused rule parser case inventory"
+  },
+  {
+    "generated_path": "references/source/adapter/parser.md",
+    "original_path": "adapter/parser.go",
+    "kind": "source",
+    "transform": "code-capsule",
+    "bytes": 731,
+    "reason": "focused outbound proxy parser case inventory"
+  },
+  {
+    "generated_path": "references/inferred/overview.md",
+    "original_path": null,
+    "kind": "inferred",
+    "transform": "markdown-view",
+    "bytes": 1988,
+    "reason": "AI-authored source-grounded repository overview"
+  },
+  {
+    "generated_path": "references/inferred/quick-start.md",
+    "original_path": null,
+    "kind": "inferred",
+    "transform": "markdown-view",
+    "bytes": 1778,
+    "reason": "AI-authored source-grounded quick start"
+  },
+  {
+    "generated_path": "references/inferred/configuration.md",
+    "original_path": null,
+    "kind": "inferred",
+    "transform": "markdown-view",
+    "bytes": 3002,
+    "reason": "AI-authored source-grounded configuration guide"
+  },
+  {
+    "generated_path": "references/inferred/api.md",
+    "original_path": null,
+    "kind": "inferred",
+    "transform": "markdown-view",
+    "bytes": 2769,
+    "reason": "AI-authored source-grounded CLI and controller API guide"
+  },
+  {
+    "generated_path": "references/inferred/architecture.md",
+    "original_path": null,
+    "kind": "inferred",
+    "transform": "markdown-view",
+    "bytes": 2613,
+    "reason": "AI-authored source-grounded runtime architecture guide"
+  },
+  {
+    "generated_path": "references/inferred/examples.md",
+    "original_path": null,
+    "kind": "inferred",
+    "transform": "markdown-view",
+    "bytes": 2136,
+    "reason": "AI-authored source-grounded examples and test-evidence guide"
+  },
+  {
+    "generated_path": "references/inferred/limitations.md",
+    "original_path": null,
+    "kind": "inferred",
+    "transform": "markdown-view",
+    "bytes": 2373,
+    "reason": "AI-authored source-grounded limitations and open questions"
+  }
+]

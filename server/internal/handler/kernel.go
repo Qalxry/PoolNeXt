@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"errors"
+	"net/http"
 	"poolx/internal/model"
 	"poolx/internal/service"
 
@@ -16,7 +18,7 @@ type mihomoInspectRequest struct {
 }
 
 // InspectMihomoBinary godoc
-// @Summary Inspect existing Mihomo binary path and verify version
+// @Summary Register an existing Mihomo binary as external immutable and verify its version
 // @Tags Kernel
 // @Accept json
 // @Produce json
@@ -32,11 +34,11 @@ func InspectMihomoBinary(c *gin.Context) {
 	result, err := service.InspectMihomoBinary(c.Request.Context(), request.InstallPath)
 	if err != nil {
 		_ = service.AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelError, "mihomo binary inspect failed | reason="+err.Error())
-		respondFailure(c, err.Error())
+		respondMihomoKernelError(c, err)
 		return
 	}
 
-	_ = service.AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelInfo, "mihomo binary inspected | path="+result.InstallPath+" | version="+result.DetectedVersion)
+	_ = service.AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelInfo, "mihomo binary inspected | mode="+result.Mode+" | path="+result.InstallPath+" | version="+result.DetectedVersion)
 	c.JSON(200, gin.H{
 		"success": true,
 		"message": "Mihomo 二进制检查通过。",
@@ -45,7 +47,7 @@ func InspectMihomoBinary(c *gin.Context) {
 }
 
 // UploadMihomoBinary godoc
-// @Summary Upload Mihomo binary, install it to target path and verify version
+// @Summary Upload a managed Mihomo binary, install it to target path and verify version
 // @Tags Kernel
 // @Accept mpfd
 // @Produce json
@@ -71,11 +73,11 @@ func UploadMihomoBinary(c *gin.Context) {
 	result, err := service.InstallUploadedMihomoBinary(c.Request.Context(), fileHeader.Filename, installPath, file)
 	if err != nil {
 		_ = service.AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelError, "mihomo binary upload failed | reason="+err.Error())
-		respondFailure(c, err.Error())
+		respondMihomoKernelError(c, err)
 		return
 	}
 
-	_ = service.AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelInfo, "mihomo binary uploaded | path="+result.InstallPath+" | version="+result.DetectedVersion)
+	_ = service.AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelInfo, "mihomo binary uploaded | mode="+result.Mode+" | path="+result.InstallPath+" | version="+result.DetectedVersion)
 	c.JSON(200, gin.H{
 		"success": true,
 		"message": "Mihomo 二进制已上传并完成版本校验。",
@@ -84,7 +86,7 @@ func UploadMihomoBinary(c *gin.Context) {
 }
 
 // DownloadMihomoBinary godoc
-// @Summary Download latest official Mihomo binary for current platform and verify version
+// @Summary Download the latest official Mihomo binary into managed storage and verify its version
 // @Tags Kernel
 // @Accept json
 // @Produce json
@@ -100,14 +102,41 @@ func DownloadMihomoBinary(c *gin.Context) {
 	result, err := service.DownloadAndInstallMihomoBinary(c.Request.Context(), request.InstallPath)
 	if err != nil {
 		_ = service.AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelError, "mihomo binary download failed | reason="+err.Error())
-		respondFailure(c, err.Error())
+		respondMihomoKernelError(c, err)
 		return
 	}
 
-	_ = service.AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelInfo, "mihomo binary downloaded | path="+result.InstallPath+" | version="+result.DetectedVersion)
+	_ = service.AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelInfo, "mihomo binary downloaded | mode="+result.Mode+" | path="+result.InstallPath+" | version="+result.DetectedVersion)
 	c.JSON(200, gin.H{
 		"success": true,
 		"message": "已从官方仓库下载 Mihomo 并完成版本校验。",
 		"data":    result,
 	})
+}
+
+func respondMihomoKernelError(c *gin.Context, err error) {
+	if errors.Is(err, service.ErrExternalImmutableKernel) {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	if errors.Is(err, service.ErrKernelOwnershipUnknown) ||
+		errors.Is(err, service.ErrUnsafeKernelPath) ||
+		errors.Is(err, service.ErrKernelPathChanged) {
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	if errors.Is(err, service.ErrKernelProtectionUnavailable) {
+		c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+	respondFailure(c, err.Error())
 }

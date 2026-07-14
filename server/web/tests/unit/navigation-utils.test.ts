@@ -10,7 +10,7 @@ describe('navigation utils', () => {
 
   it('resolves current navigation item for nested paths', () => {
     expect(getCurrentNavigationItem('/user/abc')?.label).toBe('用户');
-    expect(getCurrentNavigationItem('/file')?.label).toBe('文件');
+    expect(getCurrentNavigationItem('/file')).toBeUndefined();
     expect(getCurrentNavigationItem('/setting')?.label).toBe('设置');
   });
 });

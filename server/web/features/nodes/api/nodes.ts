@@ -1,9 +1,6 @@
 import { apiRequest } from '@/lib/api/client';
 
-import type {
-  NodeTestExecution,
-  ProxyNodeItem,
-} from '@/features/nodes/types';
+import type { NodeTestExecution, ProxyNodeItem } from '@/features/nodes/types';
 
 export function getProxyNodes(params: {
   page: number;

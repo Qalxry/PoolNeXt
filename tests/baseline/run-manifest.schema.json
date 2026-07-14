@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://poolnext.local/schemas/baseline-run-v1.json",
+  "title": "PoolNeXt baseline run manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "scenario",
+    "started_at",
+    "git_commit",
+    "metrics_jsonl",
+    "fixture_manifest_sha256",
+    "mihomo_before_snapshot",
+    "mihomo_after_snapshot",
+    "result"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "poolnext.baseline.run/v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "scenario": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "git_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$"
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "integer",
+          "boolean"
+        ]
+      }
+    },
+    "metrics_jsonl": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "mihomo_before_snapshot": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mihomo_after_snapshot": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result": {
+      "enum": [
+        "passed",
+        "failed",
+        "incomplete"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "poolnext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binary",
+        "binary_sha256",
+        "status_url",
+        "status_success",
+        "exit_code",
+        "log_path",
+        "log_bytes",
+        "dropped_log_bytes"
+      ],
+      "properties": {
+        "binary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "binary_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status_url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status_success": {
+          "type": "boolean"
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "log_path": {
+          "type": "string"
+        },
+        "log_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dropped_log_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "mihomo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "source_sha256",
+        "after_sha256",
+        "controller_url",
+        "version",
+        "exit_code",
+        "log_path",
+        "log_bytes",
+        "dropped_log_bytes"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^$|^[0-9a-f]{64}$"
+        },
+        "after_sha256": {
+          "type": "string",
+          "pattern": "^$|^[0-9a-f]{64}$"
+        },
+        "controller_url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "object"
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "log_path": {
+          "type": "string"
+        },
+        "log_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dropped_log_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

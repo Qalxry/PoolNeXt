@@ -22,7 +22,8 @@ declare global {
 }
 
 const TURNSTILE_SCRIPT_ID = 'cloudflare-turnstile-script';
-const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+const TURNSTILE_SCRIPT_SRC =
+  'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
 interface TurnstileWidgetProps {
   siteKey: string;
@@ -63,7 +64,9 @@ export function TurnstileWidget({
       });
     };
 
-    const existingScript = document.getElementById(TURNSTILE_SCRIPT_ID) as HTMLScriptElement | null;
+    const existingScript = document.getElementById(
+      TURNSTILE_SCRIPT_ID,
+    ) as HTMLScriptElement | null;
 
     if (window.turnstile) {
       mountWidget();
@@ -81,7 +84,9 @@ export function TurnstileWidget({
 
     return () => {
       cancelled = true;
-      const script = document.getElementById(TURNSTILE_SCRIPT_ID) as HTMLScriptElement | null;
+      const script = document.getElementById(
+        TURNSTILE_SCRIPT_ID,
+      ) as HTMLScriptElement | null;
       if (script) {
         script.removeEventListener('load', mountWidget);
       }
@@ -92,5 +97,5 @@ export function TurnstileWidget({
     };
   }, [onError, onExpire, onVerify, siteKey]);
 
-  return <div id={elementId} ref={containerRef} className='min-h-16' />;
+  return <div id={elementId} ref={containerRef} className="min-h-16" />;
 }

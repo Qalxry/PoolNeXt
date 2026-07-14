@@ -1,4 +1,8 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+} from 'react';
 
 import { cn } from '@/lib/utils/cn';
 
@@ -12,10 +16,16 @@ export function AuthFormField({
   children: ReactNode;
 }) {
   return (
-    <label className='block space-y-2'>
-      <span className='text-sm font-medium text-[var(--foreground-primary)]'>{label}</span>
+    <label className="block space-y-2">
+      <span className="text-sm font-medium text-[var(--foreground-primary)]">
+        {label}
+      </span>
       {children}
-      {hint ? <span className='block text-xs text-[var(--foreground-secondary)]'>{hint}</span> : null}
+      {hint ? (
+        <span className="block text-xs text-[var(--foreground-secondary)]">
+          {hint}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -25,7 +35,7 @@ export function AuthInput(props: InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cn(
-        'w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--foreground-primary)] outline-none transition placeholder:text-[var(--foreground-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)]',
+        'w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--foreground-primary)] transition outline-none placeholder:text-[var(--foreground-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)]',
         props.className,
       )}
     />

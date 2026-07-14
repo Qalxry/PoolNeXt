@@ -1,20 +1,14 @@
 package main
 
 import (
-	"embed"
+	"log"
 	_ "poolx/docs"
 	"poolx/internal/app"
 )
 
-//go:embed all:web/build all:zashboard/dist
-var buildFS embed.FS
-
-//go:embed web/build/index.html
-var indexPage []byte
-
-// @title PoolX Server API
+// @title PoolNeXt Server API
 // @version 3.0
-// @description PoolX Server API documentation.
+// @description PoolNeXt Server API documentation.
 // @BasePath /
 // @schemes http https
 // @securityDefinitions.apikey BearerAuth
@@ -22,5 +16,10 @@ var indexPage []byte
 // @name Authorization
 // @description Admin API can use Bearer Token.
 func main() {
-	app.RunServer(buildFS, "web/build", indexPage, "zashboard/dist")
+	assets, err := loadFrontendAssets()
+	if err != nil {
+		log.Fatalf("load frontend assets: %v", err)
+	}
+
+	app.RunServer(assets.fs, webBuildDir, assets.indexPage, zashboardBuildDir)
 }

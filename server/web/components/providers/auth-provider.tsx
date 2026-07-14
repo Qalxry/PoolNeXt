@@ -10,7 +10,10 @@ import {
   useState,
 } from 'react';
 
-import { logout as logoutRequest, getCurrentUser } from '@/features/auth/api/auth';
+import {
+  logout as logoutRequest,
+  getCurrentUser,
+} from '@/features/auth/api/auth';
 import type { AuthUser } from '@/types/auth';
 
 interface AuthContextValue {

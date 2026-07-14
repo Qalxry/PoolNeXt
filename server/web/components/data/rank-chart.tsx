@@ -31,101 +31,102 @@ function getChartValue(params: unknown) {
 }
 
 export function RankChart({
-                            items,
-                            color,
-                            valueFormatter = defaultFormatter,
-                            emptyMessage = '暂无分布数据',
-                          }: RankChartProps) {
+  items,
+  color,
+  valueFormatter = defaultFormatter,
+  emptyMessage = '暂无分布数据',
+}: RankChartProps) {
   const option = useMemo<EChartsOption>(
-      () => ({
-        animationDuration: 400,
-        grid: {
-          left: 16,
-          right: 24,
-          top: 12,
-          bottom: 12,
-          containLabel: true,
+    () => ({
+      animationDuration: 400,
+      grid: {
+        left: 16,
+        right: 24,
+        top: 12,
+        bottom: 12,
+        containLabel: true,
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'shadow',
         },
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: {
-            type: 'shadow',
+        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        borderWidth: 0,
+        textStyle: {
+          color: '#e2e8f0',
+          fontSize: 12,
+        },
+        formatter: (params: unknown) => {
+          const item = Array.isArray(params) ? params[0] : params;
+          const data = item as { name?: string; value?: number };
+          return `${data.name ?? ''}<br/>${valueFormatter(data.value ?? 0)}`;
+        },
+      },
+      xAxis: {
+        type: 'value',
+        axisLabel: {
+          color: '#94a3b8',
+        },
+        splitLine: {
+          lineStyle: {
+            color: 'rgba(148, 163, 184, 0.16)',
+            type: 'dashed',
           },
-          backgroundColor: 'rgba(15, 23, 42, 0.92)',
-          borderWidth: 0,
-          textStyle: {
+        },
+      },
+      yAxis: {
+        type: 'category',
+        data: items.map((item) => item.label),
+        axisTick: { show: false },
+        axisLine: { show: false },
+        axisLabel: {
+          color: '#cbd5e1',
+          width: 120,
+          overflow: 'truncate',
+        },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: items.map((item) => item.value),
+          barWidth: 12,
+          showBackground: true,
+          backgroundStyle: {
+            color: 'rgba(148, 163, 184, 0.12)',
+            borderRadius: 999,
+          },
+          itemStyle: {
+            color,
+            borderRadius: 999,
+          },
+          label: {
+            show: true,
+            position: 'right',
             color: '#e2e8f0',
-            fontSize: 12,
-          },
-          formatter: (params: unknown) => {
-            const item = Array.isArray(params) ? params[0] : params;
-            const data = item as { name?: string; value?: number };
-            return `${data.name ?? ''}<br/>${valueFormatter(data.value ?? 0)}`;
+            formatter: (params: unknown) =>
+              valueFormatter(getChartValue(params)),
           },
         },
-        xAxis: {
-          type: 'value',
-          axisLabel: {
-            color: '#94a3b8',
-          },
-          splitLine: {
-            lineStyle: {
-              color: 'rgba(148, 163, 184, 0.16)',
-              type: 'dashed',
-            },
-          },
-        },
-        yAxis: {
-          type: 'category',
-          data: items.map((item) => item.label),
-          axisTick: { show: false },
-          axisLine: { show: false },
-          axisLabel: {
-            color: '#cbd5e1',
-            width: 120,
-            overflow: 'truncate',
-          },
-        },
-        series: [
-          {
-            type: 'bar',
-            data: items.map((item) => item.value),
-            barWidth: 12,
-            showBackground: true,
-            backgroundStyle: {
-              color: 'rgba(148, 163, 184, 0.12)',
-              borderRadius: 999,
-            },
-            itemStyle: {
-              color,
-              borderRadius: 999,
-            },
-            label: {
-              show: true,
-              position: 'right',
-              color: '#e2e8f0',
-              formatter: (params: unknown) => valueFormatter(getChartValue(params)),
-            },
-          },
-        ],
-      }),
-      [color, items, valueFormatter],
+      ],
+    }),
+    [color, items, valueFormatter],
   );
 
   if (items.length === 0) {
     return (
-        <div className="flex h-[220px] items-center justify-center rounded-3xl border border-dashed border-[var(--border-default)] bg-[var(--surface-muted)] text-sm text-[var(--foreground-secondary)]">
-          {emptyMessage}
-        </div>
+      <div className="flex h-[220px] items-center justify-center rounded-3xl border border-dashed border-[var(--border-default)] bg-[var(--surface-muted)] text-sm text-[var(--foreground-secondary)]">
+        {emptyMessage}
+      </div>
     );
   }
 
   return (
-      <ReactECharts
-          option={option}
-          notMerge
-          lazyUpdate
-          style={{ height: Math.max(220, items.length * 44), width: '100%' }}
-      />
+    <ReactECharts
+      option={option}
+      notMerge
+      lazyUpdate
+      style={{ height: Math.max(220, items.length * 44), width: '100%' }}
+    />
   );
 }

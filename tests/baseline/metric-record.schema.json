@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://poolnext.local/schemas/baseline-metric-v1.json",
+  "title": "PoolNeXt baseline scalar metric",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "scenario",
+    "captured_at",
+    "metric",
+    "value",
+    "unit",
+    "sample_count",
+    "dimensions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "poolnext.baseline.metric/v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "scenario": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "git_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$"
+    },
+    "metric": {
+      "enum": [
+        "api.requests",
+        "api.errors",
+        "api.latency_ms",
+        "api.response_bytes",
+        "sql.queries",
+        "sql.latency_ms",
+        "sql.rows",
+        "process.rss_bytes",
+        "process.fd_count",
+        "process.goroutine_count",
+        "disk.logical_bytes",
+        "disk.allocated_bytes",
+        "disk.file_count",
+        "frontend.dom_nodes",
+        "frontend.rendered_rows",
+        "frontend.heap_bytes"
+      ]
+    },
+    "value": {
+      "type": "number"
+    },
+    "unit": {
+      "enum": [
+        "count",
+        "bytes",
+        "milliseconds"
+      ]
+    },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "integer",
+          "boolean"
+        ]
+      }
+    }
+  }
+}

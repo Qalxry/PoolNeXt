@@ -13,7 +13,10 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { PageHeader } from '@/components/layout/page-header';
 import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { sendEmailVerification } from '@/features/auth/api/auth';
+import {
+  beginGitHubOAuth,
+  sendEmailVerification,
+} from '@/features/auth/api/auth';
 import { getPublicStatus } from '@/features/auth/api/public';
 import {
   bindEmail,
@@ -35,6 +38,10 @@ import type {
   UpdateSelfPayload,
 } from '@/features/settings/types';
 import {
+  includeNonEmptyOptionEntries,
+  type OptionEntry,
+} from '@/features/settings/lib/option-entries';
+import {
   CodeBlock,
   PrimaryButton,
   ResourceField,
@@ -47,7 +54,7 @@ import {
 import { formatDateTime } from '@/lib/utils/date';
 
 const settingsQueryKey = ['settings', 'options'] as const;
-const defaultServerUpdateRepo = 'Rain-kl/PoolX';
+const defaultServerUpdateRepo = 'Qalxry/PoolNeXt';
 
 const defaultSystemFields = {
   ServerAddress: '',
@@ -59,7 +66,7 @@ const defaultSystemFields = {
   ClashAllowLAN: false,
   ClashExternalController: '127.0.0.1:19090',
   ClashMode: 'rule',
-  ClashSecret: '3ebc195c9fbe81c01eb9299e3c6bf644',
+  ClashSecret: '',
   NodeTestDefaultURL: 'https://cp.cloudflare.com/generate_204',
   NodeTestDefaultTimeoutMS: '8000',
   GeoIPProvider: 'disabled',
@@ -153,7 +160,10 @@ function getBrowserOrigin() {
 }
 
 function defaultMihomoInstallPath() {
-  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')) {
+  if (
+    typeof navigator !== 'undefined' &&
+    navigator.userAgent.includes('Windows')
+  ) {
     return '.\\mihomo.exe';
   }
   return './mihomo';
@@ -203,6 +213,7 @@ export function SettingsPage() {
     useState<GeoIPPreviewResult | null>(null);
   const mihomoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const isRoot = (user?.role ?? 0) >= 100;
+  const forcePasswordChange = Boolean(user?.must_change_password);
 
   const publicStatusQuery = useQuery({
     queryKey: ['public-status'],
@@ -217,7 +228,7 @@ export function SettingsPage() {
   const optionsQuery = useQuery({
     queryKey: settingsQueryKey,
     queryFn: getOptions,
-    enabled: isRoot,
+    enabled: isRoot && !forcePasswordChange,
   });
 
   useEffect(() => {
@@ -283,10 +294,10 @@ export function SettingsPage() {
       ClashExternalController:
         optionMap.ClashExternalController ?? '127.0.0.1:19090',
       ClashMode: optionMap.ClashMode ?? 'rule',
-      ClashSecret:
-        optionMap.ClashSecret ?? '3ebc195c9fbe81c01eb9299e3c6bf644',
+      ClashSecret: '',
       NodeTestDefaultURL:
-        optionMap.NodeTestDefaultURL ?? 'https://cp.cloudflare.com/generate_204',
+        optionMap.NodeTestDefaultURL ??
+        'https://cp.cloudflare.com/generate_204',
       NodeTestDefaultTimeoutMS: optionMap.NodeTestDefaultTimeoutMS ?? '8000',
       GeoIPProvider: optionMap.GeoIPProvider ?? 'disabled',
       PasswordLoginEnabled: toBoolean(optionMap.PasswordLoginEnabled, true),
@@ -454,7 +465,7 @@ export function SettingsPage() {
         label: '个人设置',
         description: '更新个人资料、绑定账号与访问令牌。',
       },
-      ...(isRoot
+      ...(isRoot && !forcePasswordChange
         ? [
             {
               key: 'clash' as const,
@@ -474,7 +485,7 @@ export function SettingsPage() {
           ]
         : []),
     ],
-    [isRoot],
+    [forcePasswordChange, isRoot],
   );
 
   const runBusyAction = async (key: string, action: () => Promise<void>) => {
@@ -491,7 +502,7 @@ export function SettingsPage() {
   };
 
   const saveOptionEntries = async (
-    entries: Array<[string, string]>,
+    entries: OptionEntry[],
     successMessage: string,
   ) => {
     for (const [key, value] of entries) {
@@ -504,6 +515,13 @@ export function SettingsPage() {
   };
 
   const handleProfileSave = () => {
+    if (forcePasswordChange && !profileFields.password) {
+      setFeedback({
+        tone: 'danger',
+        message: '当前使用的是一次性密码，必须设置新密码后才能继续使用系统。',
+      });
+      return;
+    }
     void runBusyAction('profile', async () => {
       await updateSelf({
         username: profileFields.username.trim(),
@@ -516,6 +534,16 @@ export function SettingsPage() {
       ]);
       setProfileFields((previous) => ({ ...previous, password: '' }));
       setFeedback({ tone: 'success', message: '个人资料已更新。' });
+    });
+  };
+
+  const handleBindGitHub = () => {
+    void runBusyAction('github-bind', async () => {
+      const { authorize_url: authorizeURL } = await beginGitHubOAuth(
+        'bind',
+        '/setting',
+      );
+      window.location.assign(authorizeURL);
     });
   };
 
@@ -585,7 +613,9 @@ export function SettingsPage() {
   };
 
   const requireMihomoInstallPath = (allowDefault = false) => {
-    const installPath = systemFields.MihomoBinaryPath.trim() || (allowDefault ? defaultMihomoInstallPath() : '');
+    const installPath =
+      systemFields.MihomoBinaryPath.trim() ||
+      (allowDefault ? defaultMihomoInstallPath() : '');
     if (!installPath) {
       setFeedback({
         tone: 'danger',
@@ -598,7 +628,10 @@ export function SettingsPage() {
 
   const handleClashSettingsSave = () => {
     void runBusyAction('clash-settings', async () => {
-      const timeout = Number.parseInt(systemFields.NodeTestDefaultTimeoutMS, 10);
+      const timeout = Number.parseInt(
+        systemFields.NodeTestDefaultTimeoutMS,
+        10,
+      );
       if (Number.isNaN(timeout) || timeout <= 0) {
         throw new Error('默认测速超时必须为大于 0 的整数。');
       }
@@ -614,29 +647,36 @@ export function SettingsPage() {
       if (!/^[^:]+:\d+$/.test(systemFields.ClashExternalController.trim())) {
         throw new Error('external-controller 必须为 host:port 格式。');
       }
-      if (!systemFields.ClashSecret.trim()) {
-        throw new Error('secret 不能为空。');
-      }
-      if (!['rule', 'global', 'direct'].includes(systemFields.ClashMode.trim())) {
+      if (
+        !['rule', 'global', 'direct'].includes(systemFields.ClashMode.trim())
+      ) {
         throw new Error('mode 仅支持 rule、global 或 direct。');
       }
 
       await saveOptionEntries(
-        [
-          ['KernelType', systemFields.KernelType],
-          ['ClashAllowLAN', String(systemFields.ClashAllowLAN)],
-          ['ClashExternalController', systemFields.ClashExternalController.trim()],
-          ['ClashMode', systemFields.ClashMode.trim()],
-          ['ClashSecret', systemFields.ClashSecret.trim()],
-          ['NodeTestDefaultURL', systemFields.NodeTestDefaultURL.trim()],
-          ['NodeTestDefaultTimeoutMS', String(timeout)],
-        ],
+        includeNonEmptyOptionEntries(
+          [
+            ['KernelType', systemFields.KernelType],
+            ['ClashAllowLAN', String(systemFields.ClashAllowLAN)],
+            [
+              'ClashExternalController',
+              systemFields.ClashExternalController.trim(),
+            ],
+            ['ClashMode', systemFields.ClashMode.trim()],
+            ['NodeTestDefaultURL', systemFields.NodeTestDefaultURL.trim()],
+            ['NodeTestDefaultTimeoutMS', String(timeout)],
+          ],
+          [['ClashSecret', systemFields.ClashSecret]],
+        ),
         'Clash 设置已保存。',
       );
+      setSystemFields((previous) => ({ ...previous, ClashSecret: '' }));
     });
   };
 
-  const handleMihomoUploadSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleMihomoUploadSelect = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
     const binary = event.target.files?.[0];
     if (!binary) {
       return;
@@ -646,7 +686,10 @@ export function SettingsPage() {
       event.target.value = '';
       return;
     }
-    setSystemFields((previous) => ({ ...previous, MihomoBinaryPath: installPath }));
+    setSystemFields((previous) => ({
+      ...previous,
+      MihomoBinaryPath: installPath,
+    }));
     setFeedback(null);
     setMihomoUploadProgress(0);
     await mihomoUploadMutation.mutateAsync({ binary, installPath });
@@ -657,7 +700,10 @@ export function SettingsPage() {
     if (!installPath) {
       return;
     }
-    setSystemFields((previous) => ({ ...previous, MihomoBinaryPath: installPath }));
+    setSystemFields((previous) => ({
+      ...previous,
+      MihomoBinaryPath: installPath,
+    }));
     setFeedback(null);
     mihomoDownloadMutation.mutate(installPath);
   };
@@ -709,6 +755,12 @@ export function SettingsPage() {
     if (activeTab === 'personal') {
       return (
         <div className="space-y-6">
+          {forcePasswordChange ? (
+            <InlineMessage
+              tone="danger"
+              message="这是首次登录或密码重置会话。请立即设置一个新的、唯一的密码；完成前其他管理功能会保持锁定。"
+            />
+          ) : null}
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
             <AppCard
               title="个人资料"
@@ -773,7 +825,9 @@ export function SettingsPage() {
                 <PrimaryButton
                   type="button"
                   onClick={() => accessTokenMutation.mutate()}
-                  disabled={accessTokenMutation.isPending}
+                  disabled={
+                    accessTokenMutation.isPending || forcePasswordChange
+                  }
                 >
                   {accessTokenMutation.isPending ? '生成中...' : '重置令牌'}
                 </PrimaryButton>
@@ -855,20 +909,19 @@ export function SettingsPage() {
                 </div>
                 <PrimaryButton
                   type="button"
-                  onClick={() =>
-                    window.open(
-                      `https://github.com/login/oauth/authorize?client_id=${publicStatus.github_client_id}&scope=user:email`,
-                      '_blank',
-                      'noopener,noreferrer',
-                    )
-                  }
+                  onClick={handleBindGitHub}
                   disabled={
-                    !publicStatus.github_oauth || !publicStatus.github_client_id
+                    !publicStatus.github_oauth ||
+                    !publicStatus.github_client_id ||
+                    busyKey === 'github-bind' ||
+                    forcePasswordChange
                   }
                 >
-                  {publicStatus.github_oauth
-                    ? '绑定 GitHub'
-                    : '未启用 GitHub OAuth'}
+                  {busyKey === 'github-bind'
+                    ? '正在跳转...'
+                    : publicStatus.github_oauth
+                      ? '绑定 GitHub'
+                      : '未启用 GitHub OAuth'}
                 </PrimaryButton>
               </div>
 
@@ -906,7 +959,9 @@ export function SettingsPage() {
                   type="button"
                   onClick={handleBindWeChat}
                   disabled={
-                    !publicStatus.wechat_login || busyKey === 'wechat-bind'
+                    !publicStatus.wechat_login ||
+                    busyKey === 'wechat-bind' ||
+                    forcePasswordChange
                   }
                 >
                   {busyKey === 'wechat-bind' ? '绑定中...' : '绑定微信'}
@@ -957,14 +1012,14 @@ export function SettingsPage() {
                     <SecondaryButton
                       type="button"
                       onClick={handleEmailVerification}
-                      disabled={busyKey === 'email-send'}
+                      disabled={busyKey === 'email-send' || forcePasswordChange}
                     >
                       {busyKey === 'email-send' ? '发送中...' : '发送验证码'}
                     </SecondaryButton>
                     <PrimaryButton
                       type="button"
                       onClick={handleBindEmail}
-                      disabled={busyKey === 'email-bind'}
+                      disabled={busyKey === 'email-bind' || forcePasswordChange}
                     >
                       {busyKey === 'email-bind' ? '绑定中...' : '绑定邮箱'}
                     </PrimaryButton>
@@ -1055,7 +1110,7 @@ export function SettingsPage() {
                     placeholder={
                       typeof window !== 'undefined' &&
                       navigator.userAgent.includes('Windows')
-                        ? 'C:\\poolx\\bin\\mihomo.exe'
+                        ? 'C:\\poolnext\\bin\\mihomo.exe'
                         : '/usr/local/bin/mihomo'
                     }
                   />
@@ -1154,14 +1209,14 @@ export function SettingsPage() {
                         ? '官方自动下载'
                         : systemFields.MihomoBinarySource === 'existing'
                           ? '现有路径检查'
-                        : '未设置'}
+                          : '未设置'}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4 md:col-span-2">
                   <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
                     当前路径
                   </p>
-                  <p className="mt-2 break-all text-sm text-[var(--foreground-primary)]">
+                  <p className="mt-2 text-sm break-all text-[var(--foreground-primary)]">
                     {systemFields.MihomoBinaryPath || '尚未配置'}
                   </p>
                 </div>
@@ -1189,10 +1244,7 @@ export function SettingsPage() {
                   placeholder="127.0.0.1:19090"
                 />
               </ResourceField>
-              <ResourceField
-                label="mode"
-                hint="控制最终 Clash 运行模式。"
-              >
+              <ResourceField label="mode" hint="控制最终 Clash 运行模式。">
                 <ResourceSelect
                   value={systemFields.ClashMode}
                   onChange={(event) =>
@@ -1209,9 +1261,11 @@ export function SettingsPage() {
               </ResourceField>
               <ResourceField
                 label="secret"
-                hint="控制接口访问密钥，运行控制和 API 探活都会使用它。"
+                hint="敏感值不会回显；输入新密钥可替换，留空保持当前值。"
               >
                 <ResourceInput
+                  type="password"
+                  autoComplete="new-password"
                   value={systemFields.ClashSecret}
                   onChange={(event) =>
                     setSystemFields((previous) => ({
@@ -1219,7 +1273,7 @@ export function SettingsPage() {
                       ClashSecret: event.target.value,
                     }))
                   }
-                  placeholder="3ebc195c9fbe81c01eb9299e3c6bf644"
+                  placeholder="输入新密钥，留空保持当前值"
                 />
               </ResourceField>
               <ToggleField
@@ -1282,7 +1336,6 @@ export function SettingsPage() {
     if (activeTab === 'system') {
       return (
         <div className="space-y-6">
-
           <AppCard
             title="登录与注册开关"
             description="切换后立即生效，无需重启服务。"
@@ -1383,7 +1436,7 @@ export function SettingsPage() {
               <div className="space-y-5">
                 <ResourceField
                   label="上游更新仓库"
-                  hint="默认使用 Rain-kl/PoolX，也可按 owner/repo 格式改为你自己的发布仓库。"
+                  hint="默认使用 Qalxry/PoolNeXt，也可按 owner/repo 格式改为你自己的发布仓库。"
                 >
                   <ResourceInput
                     value={systemFields.ServerUpdateRepo}
@@ -1397,7 +1450,7 @@ export function SettingsPage() {
                   />
                 </ResourceField>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 mt-5">
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
                   <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
                     服务端版本
@@ -1573,14 +1626,20 @@ export function SettingsPage() {
                   onClick={() =>
                     void runBusyAction('system-smtp', async () => {
                       await saveOptionEntries(
-                        [
-                          ['SMTPServer', systemFields.SMTPServer.trim()],
-                          ['SMTPPort', systemFields.SMTPPort.trim()],
-                          ['SMTPAccount', systemFields.SMTPAccount.trim()],
-                          ['SMTPToken', systemFields.SMTPToken.trim()],
-                        ],
+                        includeNonEmptyOptionEntries(
+                          [
+                            ['SMTPServer', systemFields.SMTPServer.trim()],
+                            ['SMTPPort', systemFields.SMTPPort.trim()],
+                            ['SMTPAccount', systemFields.SMTPAccount.trim()],
+                          ],
+                          [['SMTPToken', systemFields.SMTPToken]],
+                        ),
                         'SMTP 设置已保存。',
                       );
+                      setSystemFields((previous) => ({
+                        ...previous,
+                        SMTPToken: '',
+                      }));
                     })
                   }
                   disabled={busyKey === 'system-smtp'}
@@ -1632,6 +1691,7 @@ export function SettingsPage() {
                 >
                   <ResourceInput
                     type="password"
+                    autoComplete="new-password"
                     value={systemFields.SMTPToken}
                     onChange={(event) =>
                       setSystemFields((previous) => ({
@@ -1654,40 +1714,50 @@ export function SettingsPage() {
                   onClick={() =>
                     void runBusyAction('system-integrations', async () => {
                       await saveOptionEntries(
-                        [
+                        includeNonEmptyOptionEntries(
                           [
-                            'GitHubClientId',
-                            systemFields.GitHubClientId.trim(),
+                            [
+                              'GitHubClientId',
+                              systemFields.GitHubClientId.trim(),
+                            ],
+                            [
+                              'WeChatServerAddress',
+                              normalizeServerUrl(
+                                systemFields.WeChatServerAddress,
+                              ),
+                            ],
+                            [
+                              'WeChatAccountQRCodeImageURL',
+                              systemFields.WeChatAccountQRCodeImageURL.trim(),
+                            ],
+                            [
+                              'TurnstileSiteKey',
+                              systemFields.TurnstileSiteKey.trim(),
+                            ],
                           ],
                           [
-                            'GitHubClientSecret',
-                            systemFields.GitHubClientSecret.trim(),
+                            [
+                              'GitHubClientSecret',
+                              systemFields.GitHubClientSecret,
+                            ],
+                            [
+                              'WeChatServerToken',
+                              systemFields.WeChatServerToken,
+                            ],
+                            [
+                              'TurnstileSecretKey',
+                              systemFields.TurnstileSecretKey,
+                            ],
                           ],
-                          [
-                            'WeChatServerAddress',
-                            normalizeServerUrl(
-                              systemFields.WeChatServerAddress,
-                            ),
-                          ],
-                          [
-                            'WeChatServerToken',
-                            systemFields.WeChatServerToken.trim(),
-                          ],
-                          [
-                            'WeChatAccountQRCodeImageURL',
-                            systemFields.WeChatAccountQRCodeImageURL.trim(),
-                          ],
-                          [
-                            'TurnstileSiteKey',
-                            systemFields.TurnstileSiteKey.trim(),
-                          ],
-                          [
-                            'TurnstileSecretKey',
-                            systemFields.TurnstileSecretKey.trim(),
-                          ],
-                        ],
+                        ),
                         '第三方集成设置已保存。',
                       );
+                      setSystemFields((previous) => ({
+                        ...previous,
+                        GitHubClientSecret: '',
+                        WeChatServerToken: '',
+                        TurnstileSecretKey: '',
+                      }));
                     })
                   }
                   disabled={busyKey === 'system-integrations'}
@@ -1711,9 +1781,13 @@ export function SettingsPage() {
                       }
                     />
                   </ResourceField>
-                  <ResourceField label="GitHub Client Secret">
+                  <ResourceField
+                    label="GitHub Client Secret"
+                    hint="输入新密钥可替换，留空保持当前值。"
+                  >
                     <ResourceInput
                       type="password"
+                      autoComplete="new-password"
                       value={systemFields.GitHubClientSecret}
                       onChange={(event) =>
                         setSystemFields((previous) => ({
@@ -1734,9 +1808,13 @@ export function SettingsPage() {
                       }
                     />
                   </ResourceField>
-                  <ResourceField label="WeChat Server Token">
+                  <ResourceField
+                    label="WeChat Server Token"
+                    hint="输入新 Token 可替换，留空保持当前值。"
+                  >
                     <ResourceInput
                       type="password"
+                      autoComplete="new-password"
                       value={systemFields.WeChatServerToken}
                       onChange={(event) =>
                         setSystemFields((previous) => ({
@@ -1768,9 +1846,13 @@ export function SettingsPage() {
                       }
                     />
                   </ResourceField>
-                  <ResourceField label="Turnstile Secret Key">
+                  <ResourceField
+                    label="Turnstile Secret Key"
+                    hint="输入新密钥可替换，留空保持当前值。"
+                  >
                     <ResourceInput
                       type="password"
+                      autoComplete="new-password"
                       value={systemFields.TurnstileSecretKey}
                       onChange={(event) =>
                         setSystemFields((previous) => ({

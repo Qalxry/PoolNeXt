@@ -15,6 +15,8 @@ type apiResponse struct {
 	Data    json.RawMessage `json:"data"`
 }
 
+const testRootPassword = "router-test-pass"
+
 func setupTestDB(t *testing.T) {
 	t.Helper()
 
@@ -24,6 +26,14 @@ func setupTestDB(t *testing.T) {
 
 	if err := model.InitDB(); err != nil {
 		t.Fatalf("init test db: %v", err)
+	}
+	root := model.User{Username: "root"}
+	if err := root.FillUserByUsername(); err != nil {
+		t.Fatalf("load bootstrap root: %v", err)
+	}
+	root.Password = testRootPassword
+	if err := root.UpdateWithPasswordPolicy(true, false); err != nil {
+		t.Fatalf("set router test root password: %v", err)
 	}
 
 	t.Cleanup(func() {

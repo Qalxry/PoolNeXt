@@ -38,8 +38,12 @@ describe('log display utils', () => {
   });
 
   it('matches keyword against raw values and derived labels', () => {
-    expect(matchesLogKeyword({ ...baseItem, classification: 'legacy' }, 'legacy')).toBe(true);
+    expect(
+      matchesLogKeyword({ ...baseItem, classification: 'legacy' }, 'legacy'),
+    ).toBe(true);
     expect(matchesLogKeyword(baseItem, '系统日志')).toBe(true);
-    expect(matchesLogKeyword({ ...baseItem, level: 'fatal' }, 'unknown')).toBe(true);
+    expect(matchesLogKeyword({ ...baseItem, level: 'fatal' }, 'unknown')).toBe(
+      true,
+    );
   });
 });

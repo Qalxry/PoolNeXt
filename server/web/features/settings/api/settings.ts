@@ -121,14 +121,17 @@ export function generateAccessToken() {
 }
 
 export function bindWeChat(code: string) {
-  return apiRequest<void>(
-    `/oauth/wechat/bind?code=${encodeURIComponent(code)}`,
-  );
+  return apiRequest<void>('/oauth/wechat/bind', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
 }
 
 export function bindEmail(email: string, code: string) {
-  const searchParams = new URLSearchParams({ email, code });
-  return apiRequest<void>(`/oauth/email/bind?${searchParams.toString()}`);
+  return apiRequest<void>('/oauth/email/bind', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  });
 }
 
 export function getAboutContent() {

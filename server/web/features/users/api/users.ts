@@ -12,7 +12,9 @@ export function getUsers(page: number) {
 }
 
 export function searchUsers(keyword: string) {
-  return apiRequest<UserItem[]>(`/user/search?keyword=${encodeURIComponent(keyword)}`);
+  return apiRequest<UserItem[]>(
+    `/user/search?keyword=${encodeURIComponent(keyword)}`,
+  );
 }
 
 export function getUser(id: number) {

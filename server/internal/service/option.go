@@ -68,12 +68,12 @@ type GeoIPLookupPreview struct {
 }
 
 func ListEditableOptions() []*model.Option {
+	common.OptionMapRWMutex.RLock()
+	defer common.OptionMapRWMutex.RUnlock()
 	options := make([]*model.Option, 0, len(common.OptionMap))
-	common.OptionMapRWMutex.Lock()
-	defer common.OptionMapRWMutex.Unlock()
 
 	for key, value := range common.OptionMap {
-		if strings.Contains(key, "Token") || (strings.Contains(key, "Secret") && key != "ClashSecret") {
+		if strings.Contains(key, "Token") || strings.Contains(key, "Secret") {
 			continue
 		}
 		options = append(options, &model.Option{
@@ -85,6 +85,11 @@ func ListEditableOptions() []*model.Option {
 }
 
 func UpdateEditableOption(option model.Option) error {
+	if option.Key == "ClashExternalController" || option.Key == "ClashSecret" {
+		runtimeRegistry.operationMu.Lock()
+		defer runtimeRegistry.operationMu.Unlock()
+	}
+
 	switch option.Key {
 	case "GitHubOAuthEnabled":
 		if option.Value == "true" && common.GitHubClientId == "" {
@@ -106,14 +111,8 @@ func UpdateEditableOption(option model.Option) error {
 		if err := validateKernelType(option.Value); err != nil {
 			return err
 		}
-	case "MihomoBinaryPath":
-		if strings.TrimSpace(option.Value) == "" {
-			return fmt.Errorf("MihomoBinaryPath cannot be empty")
-		}
-	case "MihomoBinarySource":
-		if err := validateMihomoBinarySource(option.Value); err != nil {
-			return err
-		}
+	case "MihomoBinaryPath", "MihomoBinaryVersion", "MihomoBinarySource":
+		return fmt.Errorf("%s is managed by the Mihomo kernel endpoints and cannot be updated directly", option.Key)
 	case "GeoIPProvider":
 		if !geoip.IsValidProvider(option.Value) {
 			return fmt.Errorf("GeoIPProvider is invalid")
@@ -135,20 +134,32 @@ func UpdateEditableOption(option model.Option) error {
 			return fmt.Errorf("ClashAllowLAN must be true or false")
 		}
 	case "ClashExternalController":
-		if _, err := normalizeControllerAddress(option.Value); err != nil {
+		normalized, err := normalizeControllerAddress(option.Value)
+		if err != nil {
 			return err
 		}
+		current := snapshotRuntimeOptions()
+		if runtimeRegistry.activeProcess() != nil && normalized != current.ControllerAddress {
+			return fmt.Errorf("ClashExternalController cannot change while Mihomo is running; stop the runtime first")
+		}
+		option.Value = normalized
 	case "ClashMode":
 		if err := validateClashMode(option.Value); err != nil {
 			return err
 		}
 	case "ClashSecret":
-		if strings.TrimSpace(option.Value) == "" {
-			return fmt.Errorf("ClashSecret cannot be empty")
+		secret := strings.TrimSpace(option.Value)
+		if secret == "" {
+			return nil
 		}
+		current := snapshotRuntimeOptions()
+		if runtimeRegistry.activeProcess() != nil && secret != current.ControllerSecret {
+			return fmt.Errorf("ClashSecret cannot change while Mihomo is running; stop the runtime first")
+		}
+		option.Value = secret
 	}
 	if _, removed := removedTemplateOptionKeys[option.Key]; removed {
-		return fmt.Errorf("%s has been removed from PoolX options", option.Key)
+		return fmt.Errorf("%s has been removed from PoolNeXt options", option.Key)
 	}
 	if err := validateRateLimitOption(option.Key, option.Value); err != nil {
 		return err
@@ -198,15 +209,6 @@ func validateKernelType(value string) error {
 		return fmt.Errorf("当前版本仅支持 mihomo，%s 暂未开放", strings.TrimSpace(value))
 	default:
 		return fmt.Errorf("KernelType is invalid")
-	}
-}
-
-func validateMihomoBinarySource(value string) error {
-	switch strings.TrimSpace(strings.ToLower(value)) {
-	case MihomoBinarySourceExisting, MihomoBinarySourceUpload, MihomoBinarySourceDownload:
-		return nil
-	default:
-		return fmt.Errorf("MihomoBinarySource is invalid")
 	}
 }
 

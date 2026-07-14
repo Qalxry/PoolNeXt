@@ -99,7 +99,7 @@ func (f *Fetcher) FetchYAML(ctx context.Context, rawURL string) (*FetchResult, e
 		return nil, errFetchSubscription
 	}
 	req.Header.Set("Accept", "application/x-yaml,text/yaml,text/plain,*/*")
-	req.Header.Set("User-Agent", "PoolX-Server")
+	req.Header.Set("User-Agent", "PoolNeXt-Server")
 
 	resp, err := f.client.Do(req)
 	if err != nil {

@@ -3,6 +3,7 @@ package service
 import (
 	"net"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"poolx/internal/model"
@@ -195,5 +196,74 @@ func TestUpdateEditableOptionRejectsInvalidClashExternalController(t *testing.T)
 	})
 	if err == nil {
 		t.Fatal("expected invalid ClashExternalController to fail")
+	}
+}
+
+func TestUpdateEditableOptionRejectsDirectMihomoBinaryStateChanges(t *testing.T) {
+	for _, key := range []string{"MihomoBinaryPath", "MihomoBinaryVersion", "MihomoBinarySource"} {
+		t.Run(key, func(t *testing.T) {
+			err := UpdateEditableOption(model.Option{Key: key, Value: "managed-by-kernel-api"})
+			if err == nil {
+				t.Fatalf("UpdateEditableOption(%s) accepted direct kernel state mutation", key)
+			}
+		})
+	}
+}
+
+func TestListEditableOptionsOmitsControllerSecret(t *testing.T) {
+	setupServiceTestDB(t)
+	if err := model.UpdateOption("ClashSecret", "never-return-this-secret"); err != nil {
+		t.Fatalf("set ClashSecret: %v", err)
+	}
+
+	for _, option := range ListEditableOptions() {
+		if strings.Contains(option.Key, "Secret") || strings.Contains(option.Key, "Token") {
+			t.Fatalf("sensitive option was returned: %s", option.Key)
+		}
+		if strings.Contains(option.Value, "never-return-this-secret") {
+			t.Fatalf("controller secret leaked through option %s", option.Key)
+		}
+	}
+}
+
+func TestUpdateEditableOptionTreatsBlankControllerSecretAsNoOp(t *testing.T) {
+	setupServiceTestDB(t)
+	if err := model.UpdateOption("ClashSecret", "preserved-secret"); err != nil {
+		t.Fatalf("set ClashSecret: %v", err)
+	}
+
+	if err := UpdateEditableOption(model.Option{Key: "ClashSecret", Value: ""}); err != nil {
+		t.Fatalf("blank ClashSecret update should preserve the current value: %v", err)
+	}
+	if snapshot := snapshotRuntimeOptions(); snapshot.ControllerSecret != "preserved-secret" {
+		t.Fatalf("blank update changed ClashSecret: %q", snapshot.ControllerSecret)
+	}
+}
+
+func TestUpdateEditableOptionRejectsControllerCredentialChangesWhileRunning(t *testing.T) {
+	setupServiceTestDB(t)
+	resetRuntimeRegistryForTest()
+	t.Cleanup(resetRuntimeRegistryForTest)
+
+	options := snapshotRuntimeOptions()
+	process := &runtimeProcess{
+		generation:        1,
+		kernelType:        options.KernelType,
+		controllerAddress: options.ControllerAddress,
+		controllerSecret:  options.ControllerSecret,
+		done:              make(chan struct{}),
+	}
+	runtimeRegistry.mu.Lock()
+	runtimeRegistry.generation = process.generation
+	runtimeRegistry.process = process
+	runtimeRegistry.mu.Unlock()
+
+	for _, option := range []model.Option{
+		{Key: "ClashExternalController", Value: "127.0.0.1:39090"},
+		{Key: "ClashSecret", Value: "rotated-while-running"},
+	} {
+		if err := UpdateEditableOption(option); err == nil {
+			t.Fatalf("expected %s update to fail while runtime is active", option.Key)
+		}
 	}
 }

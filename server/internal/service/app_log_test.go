@@ -1,30 +1,27 @@
 package service
 
 import (
-	"poolx/internal/model"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
-func TestNormalizeLogLevelDefaultsToInfo(t *testing.T) {
-	if got := normalizeLogLevel(""); got != model.AppLogLevelInfo {
-		t.Fatalf("normalizeLogLevel empty = %q, want %q", got, model.AppLogLevelInfo)
-	}
-	if got := normalizeLogLevel("invalid"); got != model.AppLogLevelInfo {
-		t.Fatalf("normalizeLogLevel invalid = %q, want %q", got, model.AppLogLevelInfo)
+func TestSanitizeAppLogMessageNormalizesControlCharacters(t *testing.T) {
+	got := sanitizeAppLogMessage("  login\nfailed\tuser=alice\x00  ")
+	if got != "login failed user=alice" {
+		t.Fatalf("unexpected sanitized message: %q", got)
 	}
 }
 
-func TestNormalizeLogLevelSupportsKnownValues(t *testing.T) {
-	cases := []string{
-		model.AppLogLevelDebug,
-		model.AppLogLevelInfo,
-		model.AppLogLevelWarn,
-		model.AppLogLevelError,
+func TestSanitizeAppLogMessageTruncatesAtUTF8Boundary(t *testing.T) {
+	got := sanitizeAppLogMessage(strings.Repeat("界", maxAppLogMessageBytes))
+	if len(got) > maxAppLogMessageBytes {
+		t.Fatalf("sanitized message exceeds byte limit: %d", len(got))
 	}
-
-	for _, input := range cases {
-		if got := normalizeLogLevel(input); got != input {
-			t.Fatalf("normalizeLogLevel(%q) = %q, want %q", input, got, input)
-		}
+	if !utf8.ValidString(got) {
+		t.Fatal("sanitized message is not valid UTF-8")
+	}
+	if !strings.HasSuffix(got, appLogTruncatedSuffix) {
+		t.Fatalf("truncated message lacks suffix: %q", got[len(got)-32:])
 	}
 }

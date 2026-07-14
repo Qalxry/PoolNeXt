@@ -69,7 +69,10 @@ export function getPortProfileTemplates() {
   return apiRequest<PortProfileTemplateItem[]>('/port-profile-templates');
 }
 
-export function savePortProfileTemplate(name: string, payload: PortProfilePayload) {
+export function savePortProfileTemplate(
+  name: string,
+  payload: PortProfilePayload,
+) {
   return apiRequest<PortProfileTemplateItem>('/port-profile-templates', {
     method: 'POST',
     body: JSON.stringify({ name, payload }),

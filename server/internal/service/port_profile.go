@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const defaultPortProfileGroupName = "POOLX"
+const defaultPortProfileGroupName = "PoolNeXt"
 
 type PortProfilePayload struct {
 	Name             string                         `json:"name"`

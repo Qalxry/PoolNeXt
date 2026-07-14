@@ -16,7 +16,12 @@ export interface UserMutationPayload {
   password: string;
 }
 
-export type ManageUserAction = 'promote' | 'demote' | 'delete' | 'disable' | 'enable';
+export type ManageUserAction =
+  | 'promote'
+  | 'demote'
+  | 'delete'
+  | 'disable'
+  | 'enable';
 
 export interface ManageUserResult {
   role: number;

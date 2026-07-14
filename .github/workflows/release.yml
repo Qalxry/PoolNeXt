@@ -1,186 +1,177 @@
 name: Release
-permissions:
-  contents: write
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version/tag to publish, for example v1.0.0-beta"
+        description: Release version/tag to publish, for example v1.0.0-beta.
         required: false
         type: string
   push:
     tags: ["v*"]
 
+permissions:
+  contents: read
+
 jobs:
   prepare:
-    runs-on: ubuntu-latest
+    name: Resolve release metadata
+    runs-on: ubuntu-24.04
     outputs:
-      should_run: ${{ steps.version.outputs.should_run }}
       version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+      publish_latest: ${{ steps.version.outputs.publish_latest }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Resolve version metadata
         id: version
+        shell: bash
         env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          SHOULD_RUN=true
-          POINTED_TAG="$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)"
-          INPUT_VERSION="${INPUT_VERSION//[[:space:]]/}"
-
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF_NAME}"
-          elif [[ -n "$INPUT_VERSION" ]]; then
-            VERSION="$INPUT_VERSION"
-          elif [[ -n "$POINTED_TAG" ]]; then
-            VERSION="$POINTED_TAG"
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            echo "workflow_dispatch requires an explicit version input when HEAD is not tagged" >&2
-            exit 1
-          elif [[ "${GITHUB_REF}" == refs/heads/main ]]; then
-            echo "main branch release requires the current commit to be tagged" >&2
-            exit 1
+          set -euo pipefail
+          pointed_tag="$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)"
+          input_version="${INPUT_VERSION//[[:space:]]/}"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            version="$GITHUB_REF_NAME"
+          elif [[ -n "$input_version" ]]; then
+            version="$input_version"
+          elif [[ -n "$pointed_tag" ]]; then
+            version="$pointed_tag"
           else
-            echo "unable to resolve release version from the current ref" >&2
+            echo "workflow_dispatch requires a version when HEAD is not tagged" >&2
             exit 1
           fi
 
-          echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [[ "$VERSION" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
-            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'
+          stable_semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          if [[ ! "$version" =~ $semver ]]; then
+            echo "version must be a SemVer tag such as v1.2.3 or v1.2.3-rc.1: $version" >&2
+            exit 1
           fi
 
-  build-frontend:
+          if tag_commit="$(git rev-parse --verify --quiet "refs/tags/$version^{commit}")"; then
+            if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
+              echo "tag $version points to $tag_commit, not workflow commit $GITHUB_SHA" >&2
+              exit 1
+            fi
+          fi
+
+          is_prerelease=true
+          publish_latest=false
+          if [[ "$version" =~ $stable_semver ]]; then
+            is_prerelease=false
+            latest_stable="$({ git tag --list 'v*'; printf '%s\n' "$version"; } | grep -E "$stable_semver" | sort -V | tail -n1)"
+            if [[ "$version" == "$latest_stable" ]]; then publish_latest=true; fi
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "commit=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$is_prerelease" >> "$GITHUB_OUTPUT"
+          echo "publish_latest=$publish_latest" >> "$GITHUB_OUTPUT"
+
+  quality:
+    name: Required quality gate
     needs: prepare
-    if: needs.prepare.outputs.should_run == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Build Frontend
-        env:
-          CI: ""
-          VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          cd server/web
-          corepack enable
-          pnpm install --frozen-lockfile
-          NEXT_PUBLIC_APP_VERSION="$VERSION" pnpm build
-
-      - name: Build Zashboard
-        env:
-          CI: ""
-        run: |
-          cd server/zashboard
-          corepack enable
-          pnpm install --frozen-lockfile
-          pnpm build
-
-      - name: Upload Frontend Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-assets
-          path: |
-            server/web/build
-            server/zashboard/dist
-          retention-days: 1
+    uses: ./.github/workflows/ci.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      commit: ${{ needs.prepare.outputs.commit }}
+    permissions:
+      contents: read
 
   build-binaries:
-    needs:
-      - prepare
-      - build-frontend
-    if: needs.prepare.outputs.should_run == 'true'
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: [prepare, quality]
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
           - goos: linux
             goarch: amd64
-            asset_name: poolx-server-linux-amd64
+            asset_name: poolnext-server-linux-amd64
           - goos: linux
             goarch: arm64
-            asset_name: poolx-server-linux-arm64
+            asset_name: poolnext-server-linux-arm64
           - goos: darwin
             goarch: amd64
-            asset_name: poolx-server-darwin-amd64
+            asset_name: poolnext-server-darwin-amd64
           - goos: darwin
             goarch: arm64
-            asset_name: poolx-server-darwin-arm64
+            asset_name: poolnext-server-darwin-arm64
           - goos: windows
             goarch: amd64
-            asset_name: poolx-server-windows-amd64.exe
-
+            asset_name: poolnext-server-windows-amd64.exe
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Download Frontend Artifact
-        uses: actions/download-artifact@v4
+      - name: Download verified WebUI build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: frontend-assets
-          path: server
+          name: quality-web-build
+          path: server/web/build
+
+      - name: Download verified Zashboard build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: quality-zashboard-build
+          path: server/zashboard/dist
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
-          go-version-file: server/go.mod
+          go-version: 1.24.13
+          cache-dependency-path: server/go.sum
 
-      - name: Build Server
-        working-directory: server
+      - name: Build server
         env:
-          CGO_ENABLED: 0
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           ASSET_NAME: ${{ matrix.asset_name }}
           VERSION: ${{ needs.prepare.outputs.version }}
+          COMMIT: ${{ needs.prepare.outputs.commit }}
         run: |
-          go mod download
-          mkdir -p ../dist
-          go build -trimpath -ldflags "-s -w -X 'poolx/internal/pkg/common.Version=$VERSION'" -o "../dist/$ASSET_NAME" .
+          make build-server-from-assets \
+            GOOS="$GOOS" \
+            GOARCH="$GOARCH" \
+            VERSION="$VERSION" \
+            COMMIT="$COMMIT" \
+            SERVER_BINARY="$PWD/dist/$ASSET_NAME"
 
-      - name: Upload Binary Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: server-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: release-server-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/${{ matrix.asset_name }}
+          if-no-files-found: error
           retention-days: 1
 
   release:
-    needs:
-      - prepare
-      - build-binaries
-    if: needs.prepare.outputs.should_run == 'true'
-    runs-on: ubuntu-latest
+    name: Publish GitHub release
+    needs: [prepare, build-binaries]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
-      - name: Download Server Artifacts
-        uses: actions/download-artifact@v4
+      - name: Download server artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: "server-*"
+          pattern: release-server-*
           path: dist
           merge-multiple: true
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - name: Publish release
+        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2.3.3
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
           name: ${{ needs.prepare.outputs.version }}
@@ -188,6 +179,8 @@ jobs:
           files: dist/*
           draft: false
           prerelease: ${{ needs.prepare.outputs.is_prerelease == 'true' }}
+          make_latest: ${{ needs.prepare.outputs.publish_latest }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

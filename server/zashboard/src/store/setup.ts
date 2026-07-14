@@ -11,12 +11,10 @@ const buildFixedBackend = (): Backend => ({
   uuid: FIXED_BACKEND_UUID,
   protocol: window.location.protocol.replace(':', ''),
   host: window.location.hostname,
-  port:
-    window.location.port ||
-    (window.location.protocol === 'https:' ? '443' : '80'),
+  port: window.location.port || (window.location.protocol === 'https:' ? '443' : '80'),
   secondaryPath: '/api/zashboard/clash',
   password: '',
-  label: 'PoolX Clash',
+  label: 'PoolNeXt Clash',
 })
 
 export const backendList = useStorage<Backend[]>('setup/api-list', [])

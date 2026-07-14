@@ -1,13 +1,16 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	migratepkg "poolx/internal/model/migrate"
 	"poolx/internal/pkg/common"
 	"poolx/internal/pkg/utils/security"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/glebarez/sqlite"
@@ -17,6 +20,8 @@ import (
 )
 
 var DB *gorm.DB
+
+const bootstrapCredentialFileEnv = "POOLNEXT_BOOTSTRAP_FILE"
 
 type dbModel struct {
 	value     any
@@ -68,22 +73,105 @@ func buildDBModels() ([]dbModel, error) {
 
 func createRootAccountIfNeed() error {
 	var user User
-	if err := DB.First(&user).Error; err != nil {
-		slog.Info("no user exists, create a root user", "username", "root")
-		hashedPassword, err := security.Password2Hash("123456")
-		if err != nil {
-			return err
+	err := DB.First(&user).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("check existing users: %w", err)
+	}
+
+	oneTimePassword := security.GenerateRandomString(20)
+	if oneTimePassword == "" {
+		return errors.New("generate bootstrap root password failed")
+	}
+	credentialPath, err := writeBootstrapCredentialFile("root", oneTimePassword)
+	if err != nil {
+		return err
+	}
+	rootUser := User{
+		Username:           "root",
+		Password:           oneTimePassword,
+		Role:               common.RoleRootUser,
+		Status:             common.UserStatusEnabled,
+		DisplayName:        "Root User",
+		AuthVersion:        1,
+		MustChangePassword: true,
+	}
+	if err := rootUser.Insert(); err != nil {
+		_ = removeBootstrapCredentialFile()
+		return fmt.Errorf("create bootstrap root user: %w", err)
+	}
+	slog.Warn(
+		"initial root account created; change the one-time password immediately",
+		"username", rootUser.Username,
+		"bootstrap_credentials_file", credentialPath,
+	)
+	return nil
+}
+
+func bootstrapCredentialFilePath() (string, error) {
+	configured := strings.TrimSpace(os.Getenv(bootstrapCredentialFileEnv))
+	if configured != "" {
+		return filepath.Abs(configured)
+	}
+	baseDir := "."
+	if common.SQLDSN == "" && common.SQLitePath != "" {
+		baseDir = filepath.Dir(common.SQLitePath)
+	}
+	return filepath.Abs(filepath.Join(baseDir, "poolnext-bootstrap.txt"))
+}
+
+func writeBootstrapCredentialFile(username string, password string) (string, error) {
+	path, err := bootstrapCredentialFilePath()
+	if err != nil {
+		return "", fmt.Errorf("resolve bootstrap credential path: %w", err)
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return "", fmt.Errorf("bootstrap credential file already exists at %s; remove it only after confirming the root account state", path)
 		}
-		rootUser := User{
-			Username:    "root",
-			Password:    hashedPassword,
-			Role:        common.RoleRootUser,
-			Status:      common.UserStatusEnabled,
-			DisplayName: "Root User",
+		return "", fmt.Errorf("create bootstrap credential file: %w", err)
+	}
+	removeOnFailure := true
+	defer func() {
+		_ = file.Close()
+		if removeOnFailure {
+			_ = os.Remove(path)
 		}
-		DB.Create(&rootUser)
+	}()
+	content := fmt.Sprintf(
+		"PoolNeXt one-time bootstrap credentials\nusername: %s\npassword: %s\n\nSign in and change this password immediately. This file is removed after the first password change.\n",
+		username,
+		password,
+	)
+	if _, err := file.WriteString(content); err != nil {
+		return "", fmt.Errorf("write bootstrap credential file: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		return "", fmt.Errorf("sync bootstrap credential file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return "", fmt.Errorf("close bootstrap credential file: %w", err)
+	}
+	removeOnFailure = false
+	return path, nil
+}
+
+func removeBootstrapCredentialFile() error {
+	path, err := bootstrapCredentialFilePath()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	return nil
+}
+
+func ensureUserSecurityDefaults() error {
+	return DB.Model(&User{}).Where("auth_version = 0").Update("auth_version", 1).Error
 }
 
 func CountTable(tableName string) (num int64) {
@@ -119,6 +207,8 @@ func migrationHooks() migratepkg.Hooks {
 			requiredModels,
 			[]migratepkg.RequiredColumn{
 				{Model: &AppLog{}, Table: "app_logs", Column: "Level"},
+				{Model: &User{}, Table: "users", Column: "auth_version"},
+				{Model: &User{}, Table: "users", Column: "must_change_password"},
 				{Model: &SourceConfig{}, Table: "source_configs", Column: "source_type"},
 				{Model: &SourceConfig{}, Table: "source_configs", Column: "source_url"},
 				{Model: &SourceConfig{}, Table: "source_configs", Column: "content_type"},
@@ -272,6 +362,9 @@ func InitDB() (err error) {
 	}
 	DB = db
 	if err = ensureDatabaseSchemaUpToDate(db, backend); err != nil {
+		return err
+	}
+	if err = ensureUserSecurityDefaults(); err != nil {
 		return err
 	}
 	return createRootAccountIfNeed()

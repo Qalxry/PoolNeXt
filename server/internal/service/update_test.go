@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"poolx/internal/pkg/common"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -23,6 +25,7 @@ func (f serverUpdateRoundTripFunc) RoundTrip(req *http.Request) (*http.Response,
 func resetServerUpgradeTestState(t *testing.T) {
 	t.Helper()
 	serverUpgradeState.Lock()
+	serverUpgradeState.activeTaskID = 0
 	serverUpgradeState.inProgress = false
 	serverUpgradeState.status = ""
 	serverUpgradeState.logs = nil
@@ -34,9 +37,9 @@ func resetServerUpgradeTestState(t *testing.T) {
 
 func fakeServerBinaryFixture(version string) (string, []byte) {
 	if runtime.GOOS == "windows" {
-		return "poolx-server-test.cmd", []byte("@echo off\r\necho " + version + "\r\n")
+		return "poolnext-server-test.cmd", []byte("@echo off\r\necho " + version + "\r\n")
 	}
-	return "poolx-server-test.sh", []byte("#!/bin/sh\necho " + version + "\n")
+	return "poolnext-server-test.sh", []byte("#!/bin/sh\necho " + version + "\n")
 }
 
 func TestIsVersionNewer(t *testing.T) {
@@ -85,7 +88,7 @@ func TestBuildLatestServerReleaseView(t *testing.T) {
 	view := buildLatestServerReleaseView(&githubReleaseResponse{
 		TagName:     "v0.5.0",
 		Body:        "release notes",
-		HTMLURL:     "https://github.com/Rain-kl/PoolX/releases/tag/v0.5.0",
+		HTMLURL:     "https://github.com/Qalxry/PoolNeXt/releases/tag/v0.5.0",
 		PublishedAt: "2026-03-11T00:00:00Z",
 	}, ReleaseChannelStable)
 
@@ -228,7 +231,7 @@ func TestUploadManualServerBinary(t *testing.T) {
 }
 
 func TestBuildUploadedServerBinaryViewAcceptsGitDescribeNewerThanTag(t *testing.T) {
-	info := buildUploadedServerBinaryView("poolx-server-test", "v0.6.3", "v0.6.3-2-gf4d36be", time.Now())
+	info := buildUploadedServerBinaryView("poolnext-server-test", "v0.6.3", "v0.6.3-2-gf4d36be", time.Now())
 	if !info.HasUpdate || !info.ReadyToUpgrade {
 		t.Fatalf("expected git describe binary to be upgradeable: %+v", info)
 	}
@@ -301,6 +304,7 @@ func TestConfirmManualServerUpgrade(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("expected manual upgrade executor to be called")
 	}
+	waitForServerUpgradeStatus(t, "succeeded")
 }
 
 func TestBuildLatestServerReleaseViewIncludesUpgradeLogs(t *testing.T) {
@@ -349,19 +353,19 @@ func TestScheduleServerUpgradeUsesDownloadedBinaryValidation(t *testing.T) {
 	SetUpdateHTTPClientForTest(&http.Client{
 		Transport: serverUpdateRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.String() {
-			case "https://api.github.com/repos/Rain-kl/PoolX/releases/latest":
+			case "https://api.github.com/repos/Qalxry/PoolNeXt/releases/latest":
 				return &http.Response{
 					StatusCode: http.StatusOK,
 					Header:     make(http.Header),
 					Body: io.NopCloser(strings.NewReader(`{
 						"tag_name":"v0.5.0",
 						"body":"release notes",
-						"html_url":"https://github.com/Rain-kl/PoolX/releases/tag/v0.5.0",
+						"html_url":"https://github.com/Qalxry/PoolNeXt/releases/tag/v0.5.0",
 						"published_at":"2026-03-11T00:00:00Z",
-						"assets":[{"name":"poolx-server-` + runtime.GOOS + `-` + runtime.GOARCH + `","browser_download_url":"https://downloads.example.com/poolx-server"}]
+							"assets":[{"name":"poolnext-server-` + runtime.GOOS + `-` + runtime.GOARCH + `","browser_download_url":"https://downloads.example.com/poolnext-server"}]
 					}`)),
 				}, nil
-			case "https://downloads.example.com/poolx-server":
+			case "https://downloads.example.com/poolnext-server":
 				_, content := fakeServerBinaryFixture("v0.5.0")
 				return &http.Response{
 					StatusCode: http.StatusOK,
@@ -404,6 +408,7 @@ func TestScheduleServerUpgradeUsesDownloadedBinaryValidation(t *testing.T) {
 		t.Fatal("expected automatic upgrade executor to be called")
 	}
 
+	waitForServerUpgradeStatus(t, "succeeded")
 	_, status, logs := snapshotServerUpgradeState()
 	if status != "succeeded" {
 		t.Fatalf("expected succeeded status after executor call, got %s", status)
@@ -411,4 +416,196 @@ func TestScheduleServerUpgradeUsesDownloadedBinaryValidation(t *testing.T) {
 	if len(logs) == 0 {
 		t.Fatal("expected upgrade logs to be recorded")
 	}
+}
+
+func TestScheduleServerUpgradeReservesCoordinatorDuringPreparation(t *testing.T) {
+	originalVersion := common.Version
+	originalClient := UpdateHTTPClientForTest()
+	common.Version = "v0.4.0"
+	requestEntered := make(chan struct{})
+	releaseRequest := make(chan struct{})
+	var requestCount atomic.Int32
+	SetUpdateHTTPClientForTest(&http.Client{
+		Transport: serverUpdateRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if !strings.HasSuffix(req.URL.Path, "/releases/latest") {
+				return nil, errors.New("unexpected update request")
+			}
+			if requestCount.Add(1) == 1 {
+				close(requestEntered)
+			}
+			<-releaseRequest
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(`{
+					"tag_name":"v0.5.0",
+					"published_at":"2026-03-11T00:00:00Z",
+					"assets":[]
+				}`)),
+			}, nil
+		}),
+	})
+	released := false
+	release := func() {
+		if !released {
+			close(releaseRequest)
+			released = true
+		}
+	}
+	t.Cleanup(func() {
+		release()
+		common.Version = originalVersion
+		SetUpdateHTTPClientForTest(originalClient)
+		resetServerUpgradeTestState(t)
+	})
+
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := ScheduleServerUpgrade("stable")
+		firstDone <- err
+	}()
+	select {
+	case <-requestEntered:
+	case <-time.After(time.Second):
+		t.Fatal("first upgrade did not enter release preparation")
+	}
+
+	secondDone := make(chan error, 1)
+	go func() {
+		_, err := ScheduleServerUpgrade("stable")
+		secondDone <- err
+	}()
+	select {
+	case err := <-secondDone:
+		if err == nil || !strings.Contains(err.Error(), "正在执行") {
+			t.Fatalf("expected concurrent upgrade rejection, got %v", err)
+		}
+	case <-time.After(200 * time.Millisecond):
+		release()
+		<-firstDone
+		<-secondDone
+		t.Fatal("second upgrade entered preparation instead of being rejected atomically")
+	}
+
+	release()
+	if err := <-firstDone; err == nil || !strings.Contains(err.Error(), "缺少当前平台") {
+		t.Fatalf("expected first preparation to fail on missing asset, got %v", err)
+	}
+	if got := requestCount.Load(); got != 1 {
+		t.Fatalf("expected one release request, got %d", got)
+	}
+	inProgress, status, _ := snapshotServerUpgradeState()
+	if inProgress || status != "failed" {
+		t.Fatalf("expected failed coordinator state after preparation error, got in_progress=%v status=%s", inProgress, status)
+	}
+}
+
+func TestStaleServerUpgradeResultCannotOverwriteCurrentTask(t *testing.T) {
+	resetServerUpgradeTestState(t)
+	originalExecutor := ServerBinaryUpgradeExecutorForTest()
+	var replacementExecuted atomic.Bool
+	SetServerBinaryUpgradeExecutorForTest(func(execPath string, tempPath string) error {
+		replacementExecuted.Store(true)
+		return nil
+	})
+	t.Cleanup(func() {
+		SetServerBinaryUpgradeExecutorForTest(originalExecutor)
+		resetServerUpgradeTestState(t)
+	})
+
+	firstTask, err := beginServerUpgrade("first task")
+	if err != nil {
+		t.Fatalf("begin first task: %v", err)
+	}
+	markServerUpgradeRestarting(firstTask)
+	markServerUpgradeSucceeded(firstTask)
+
+	secondTask, err := beginServerUpgrade("second task")
+	if err != nil {
+		t.Fatalf("begin second task: %v", err)
+	}
+	if err := executeServerBinaryCandidateUpgrade(firstTask, &manualServerBinaryCandidate{}, "manual"); err == nil {
+		t.Fatal("expected stale task execution to be rejected")
+	}
+	if replacementExecuted.Load() {
+		t.Fatal("stale task reached the binary replacement executor")
+	}
+	recordServerUpgradeFailure(firstTask, errors.New("stale failure"))
+	recordServerUpgradeLog(firstTask, "error", "stale log")
+
+	inProgress, status, logs := snapshotServerUpgradeState()
+	if !inProgress || status != "running" {
+		t.Fatalf("stale task overwrote current coordinator: in_progress=%v status=%s", inProgress, status)
+	}
+	for _, entry := range logs {
+		if strings.Contains(entry.Message, "stale") {
+			t.Fatalf("stale task appended a log to the current task: %+v", entry)
+		}
+	}
+	recordServerUpgradeFailure(secondTask, errors.New("test cleanup"))
+}
+
+func TestServerUpgradeUnsubscribeIsSerializedWithBroadcast(t *testing.T) {
+	updates, unsubscribe := SubscribeServerUpgradeStream()
+	<-updates
+
+	hookEntered := make(chan struct{})
+	releaseBroadcast := make(chan struct{})
+	broadcastDone := make(chan struct{})
+	go func() {
+		broadcastServerUpgradeSnapshotWithHook(func() {
+			close(hookEntered)
+			<-releaseBroadcast
+		})
+		close(broadcastDone)
+	}()
+	select {
+	case <-hookEntered:
+	case <-time.After(time.Second):
+		t.Fatal("broadcast did not reach subscriber send phase")
+	}
+
+	unsubscribeStarted := make(chan struct{})
+	unsubscribeDone := make(chan struct{})
+	go func() {
+		close(unsubscribeStarted)
+		unsubscribe()
+		close(unsubscribeDone)
+	}()
+	<-unsubscribeStarted
+	select {
+	case <-unsubscribeDone:
+		close(releaseBroadcast)
+		<-broadcastDone
+		t.Fatal("unsubscribe closed the listener while broadcast still owned it")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(releaseBroadcast)
+	select {
+	case <-broadcastDone:
+	case <-time.After(time.Second):
+		t.Fatal("broadcast did not finish")
+	}
+	select {
+	case <-unsubscribeDone:
+	case <-time.After(time.Second):
+		t.Fatal("unsubscribe did not finish after broadcast")
+	}
+	for range updates {
+	}
+}
+
+func waitForServerUpgradeStatus(t *testing.T, expected string) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		_, status, _ := snapshotServerUpgradeState()
+		if status == expected {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	_, status, _ := snapshotServerUpgradeState()
+	t.Fatalf("timed out waiting for upgrade status %q, got %q", expected, status)
 }

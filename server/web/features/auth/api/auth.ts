@@ -1,6 +1,8 @@
 import { apiRequest } from '@/lib/api/client';
 import type {
   AuthUser,
+  GitHubOAuthResult,
+  GitHubOAuthStart,
   LoginPayload,
   PasswordResetRequestPayload,
   RegisterPayload,
@@ -22,7 +24,9 @@ export function logout() {
 }
 
 export function register(payload: RegisterPayload, turnstileToken?: string) {
-  const query = turnstileToken ? `?turnstile=${encodeURIComponent(turnstileToken)}` : '';
+  const query = turnstileToken
+    ? `?turnstile=${encodeURIComponent(turnstileToken)}`
+    : '';
 
   return apiRequest<void>(`/user/register${query}`, {
     method: 'POST',
@@ -55,6 +59,16 @@ export function resetPassword(payload: PasswordResetRequestPayload) {
   });
 }
 
-export function exchangeGitHubCode(code: string) {
-  return apiRequest<AuthUser>(`/oauth/github?code=${encodeURIComponent(code)}`);
+export function beginGitHubOAuth(mode: 'login' | 'bind', redirect = '/') {
+  const searchParams = new URLSearchParams({ mode, redirect });
+  return apiRequest<GitHubOAuthStart>(
+    `/oauth/github?${searchParams.toString()}`,
+  );
+}
+
+export function exchangeGitHubCode(code: string, state: string) {
+  const searchParams = new URLSearchParams({ code, state });
+  return apiRequest<GitHubOAuthResult>(
+    `/oauth/github?${searchParams.toString()}`,
+  );
 }

@@ -181,14 +181,16 @@ function SidebarContent({
     <div className="flex h-full flex-col gap-5">
       <div className="flex items-center gap-3 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] px-3 py-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--brand-primary-soft)] text-sm font-semibold text-[var(--brand-primary)]">
-          PX
+          PN
         </div>
         {showLabel ? (
           <div>
             <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-            PoolX
+              PoolNeXt
             </p>
-            <p className="text-xs text-[var(--foreground-secondary)]">Control Plane</p>
+            <p className="text-xs text-[var(--foreground-secondary)]">
+              Control Plane
+            </p>
           </div>
         ) : null}
       </div>

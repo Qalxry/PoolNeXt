@@ -7,7 +7,13 @@ import { PasswordResetRequestForm } from '@/features/auth/components/password-re
 
 export function PasswordResetFlow() {
   const searchParams = useSearchParams();
-  const hasConfirmationParams = Boolean(searchParams?.get('email') && searchParams?.get('token'));
+  const hasConfirmationParams = Boolean(
+    searchParams?.get('email') && searchParams?.get('token'),
+  );
 
-  return hasConfirmationParams ? <PasswordResetConfirmForm /> : <PasswordResetRequestForm />;
+  return hasConfirmationParams ? (
+    <PasswordResetConfirmForm />
+  ) : (
+    <PasswordResetRequestForm />
+  );
 }
