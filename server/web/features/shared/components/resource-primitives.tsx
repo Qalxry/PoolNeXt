@@ -23,7 +23,7 @@ function FieldTooltip({ content }: { content: string }) {
       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-elevated)] text-[11px] font-semibold text-[var(--foreground-secondary)] transition group-hover/tooltip:border-[var(--border-strong)] group-hover/tooltip:text-[var(--foreground-primary)]">
         ?
       </span>
-      <span className="pointer-events-none absolute top-full left-1/2 z-20 mt-2 w-64 -translate-x-1/2 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] px-3 py-2 text-xs leading-5 text-[var(--foreground-secondary)] opacity-0 shadow-[var(--shadow-soft)] transition-opacity delay-700 duration-200 group-hover/tooltip:opacity-100">
+      <span className="pointer-events-none absolute top-full left-1/2 z-20 mt-2 w-64 -translate-x-1/2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-panel)] px-3 py-2 text-xs leading-5 text-[var(--foreground-secondary)] opacity-0 shadow-[var(--shadow-soft)] transition-opacity delay-700 duration-200 group-hover/tooltip:opacity-100">
         {content}
       </span>
     </span>
@@ -39,8 +39,8 @@ export function ResourceField({
   children,
 }: ResourceFieldProps) {
   return (
-    <label className={cn('block space-y-2', className)}>
-      <span className="flex items-center gap-2 text-sm font-medium text-[var(--foreground-primary)]">
+    <label className={cn('block space-y-1.5', className)}>
+      <span className="flex items-center gap-2 text-xs font-medium text-[var(--foreground-primary)]">
         <span>{label}</span>
         {tooltip ? <FieldTooltip content={tooltip} /> : null}
       </span>
@@ -63,7 +63,7 @@ export function ResourceInput(props: InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cn(
-        'w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--foreground-primary)] transition outline-none placeholder:text-[var(--foreground-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60',
+        'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--foreground-primary)] transition outline-none placeholder:text-[var(--foreground-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60',
         props.className,
       )}
     />
@@ -77,7 +77,7 @@ export function ResourceTextarea(
     <textarea
       {...props}
       className={cn(
-        'min-h-28 w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--foreground-primary)] transition outline-none placeholder:text-[var(--foreground-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60',
+        'min-h-24 w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--foreground-primary)] transition outline-none placeholder:text-[var(--foreground-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60',
         props.className,
       )}
     />
@@ -89,7 +89,7 @@ export function ResourceSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
     <select
       {...props}
       className={cn(
-        'w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--foreground-primary)] transition outline-none focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60',
+        'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--foreground-primary)] transition outline-none focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60',
         props.className,
       )}
     />
@@ -98,7 +98,7 @@ export function ResourceSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
 
 function baseButtonClassName(className?: string) {
   return cn(
-    'inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
+    'inline-flex min-h-9 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
     className,
   );
 }
@@ -172,7 +172,7 @@ export function ToggleField({
   onChange,
 }: ToggleFieldProps) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 self-start rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3">
+    <label className="flex cursor-pointer items-start gap-3 self-start rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
       <input
         type="checkbox"
         checked={checked}
@@ -205,7 +205,7 @@ export function CodeBlock({
   return (
     <pre
       className={cn(
-        'overflow-x-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4 text-xs leading-6 text-[var(--foreground-primary)]',
+        'overflow-x-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-3 text-xs leading-5 text-[var(--foreground-primary)]',
         className,
       )}
     >

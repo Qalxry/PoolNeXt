@@ -136,6 +136,46 @@ func TestUpdateEditableOptionAppliesNodeTestDefaults(t *testing.T) {
 	}
 }
 
+func TestUpdateEditableOptionValidatesNodeHealthSettings(t *testing.T) {
+	setupServiceTestDB(t)
+	originalEnabled := common.NodeHealthCheckEnabled
+	originalInterval := common.NodeHealthCheckIntervalSeconds
+	originalConcurrency := common.NodeHealthCheckConcurrency
+	originalThreshold := common.NodeHealthFailureThreshold
+	t.Cleanup(func() {
+		common.NodeHealthCheckEnabled = originalEnabled
+		common.NodeHealthCheckIntervalSeconds = originalInterval
+		common.NodeHealthCheckConcurrency = originalConcurrency
+		common.NodeHealthFailureThreshold = originalThreshold
+	})
+
+	valid := []model.Option{
+		{Key: "NodeHealthCheckEnabled", Value: "false"},
+		{Key: "NodeHealthCheckIntervalSeconds", Value: "120"},
+		{Key: "NodeHealthCheckConcurrency", Value: "3"},
+		{Key: "NodeHealthFailureThreshold", Value: "4"},
+	}
+	for _, option := range valid {
+		if err := UpdateEditableOption(option); err != nil {
+			t.Fatalf("update %s: %v", option.Key, err)
+		}
+	}
+	if common.NodeHealthCheckEnabled || common.NodeHealthCheckIntervalSeconds != 120 || common.NodeHealthCheckConcurrency != 3 || common.NodeHealthFailureThreshold != 4 {
+		t.Fatalf("node health settings were not applied")
+	}
+
+	invalid := []model.Option{
+		{Key: "NodeHealthCheckIntervalSeconds", Value: "29"},
+		{Key: "NodeHealthCheckConcurrency", Value: "5"},
+		{Key: "NodeHealthFailureThreshold", Value: "0"},
+	}
+	for _, option := range invalid {
+		if err := UpdateEditableOption(option); err == nil {
+			t.Fatalf("expected %s=%s to be rejected", option.Key, option.Value)
+		}
+	}
+}
+
 func TestUpdateEditableOptionRejectsInvalidNodeTestDefaultTimeout(t *testing.T) {
 	setupServiceTestDB(t)
 

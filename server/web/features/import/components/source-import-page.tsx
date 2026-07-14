@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/feedback/error-state';
 import { InlineMessage } from '@/components/feedback/inline-message';
 import { PageHeader } from '@/components/layout/page-header';
 import { AppCard } from '@/components/ui/app-card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
   importSourceConfig,
   parseSourceConfig,
@@ -89,6 +90,10 @@ function duplicateScopeLabel(scope: string) {
     default:
       return '可导入';
   }
+}
+
+function duplicateScopeVariant(scope: string) {
+  return scope === 'none' ? ('success' as const) : ('warning' as const);
 }
 
 export function SourceImportPanel({
@@ -467,49 +472,65 @@ export function SourceImportPanel({
               title="节点预览"
               description="默认最多展示前 100 个解析结果，支持勾选后批量测速或从本次预览移除。"
             >
-              <div className="space-y-3">
-                {previewNodes.map((node, index) => (
-                  <div
-                    key={`${node.fingerprint}-${index}`}
-                    className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4"
-                  >
-                    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="flex gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedSet.has(node.fingerprint)}
-                          disabled={node.duplicate_scope !== 'none'}
-                          onChange={(event) =>
-                            handleToggleNode(
-                              node.fingerprint,
-                              event.target.checked,
-                            )
-                          }
-                          className="mt-1 h-4 w-4 rounded border-[var(--border-default)] accent-[var(--brand-primary)]"
-                        />
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-[var(--foreground-primary)]">
+              <div className="max-h-[560px] overflow-auto rounded-lg border border-[var(--border-default)]">
+                <table className="w-full min-w-[680px] border-collapse text-left text-xs">
+                  <thead className="sticky top-0 z-10 bg-[var(--surface-muted)] text-[var(--foreground-secondary)]">
+                    <tr>
+                      <th className="w-10 px-3 py-2 font-medium">选</th>
+                      <th className="min-w-64 px-2 py-2 font-medium">节点</th>
+                      <th className="w-28 px-2 py-2 font-medium">协议</th>
+                      <th className="min-w-56 px-2 py-2 font-medium">出口</th>
+                      <th className="w-28 px-3 py-2 font-medium">导入状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewNodes.map((node, index) => (
+                      <tr
+                        key={`${node.fingerprint}-${index}`}
+                        className="border-t border-[var(--border-default)] hover:bg-[var(--surface-muted)]/70"
+                      >
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedSet.has(node.fingerprint)}
+                            disabled={node.duplicate_scope !== 'none'}
+                            onChange={(event) =>
+                              handleToggleNode(
+                                node.fingerprint,
+                                event.target.checked,
+                              )
+                            }
+                            aria-label={`选择预览节点 ${node.name}`}
+                            className="h-4 w-4 accent-[var(--brand-primary)]"
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <p
+                            className="max-w-80 truncate font-medium text-[var(--foreground-primary)]"
+                            title={node.name}
+                          >
                             {node.name}
                           </p>
-                          <p className="text-sm text-[var(--foreground-secondary)]">
-                            {node.type.toUpperCase()} · {node.server}:
-                            {node.port}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-                          {selectedSet.has(node.fingerprint)
-                            ? '已选择'
-                            : '未选择'}
-                        </p>
-                        <span className="inline-flex min-h-9 items-center rounded-full border border-[var(--border-default)] px-3 text-xs text-[var(--foreground-secondary)]">
-                          {duplicateScopeLabel(node.duplicate_scope)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                        <td className="px-2 py-2 text-[var(--foreground-secondary)] uppercase">
+                          {node.type}
+                        </td>
+                        <td className="px-2 py-2 font-mono text-[11px] text-[var(--foreground-secondary)]">
+                          {node.server}:{node.port}
+                        </td>
+                        <td className="px-3 py-2">
+                          <StatusBadge
+                            label={duplicateScopeLabel(node.duplicate_scope)}
+                            variant={duplicateScopeVariant(
+                              node.duplicate_scope,
+                            )}
+                            className="!px-2 !py-0.5"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </AppCard>
 

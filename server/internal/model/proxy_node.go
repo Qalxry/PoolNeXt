@@ -9,38 +9,43 @@ const (
 )
 
 type ProxyNode struct {
-	ID               int        `json:"id" gorm:"primaryKey;autoIncrement"`
-	SourceConfigID   int        `json:"source_config_id" gorm:"index;not null"`
-	SourceConfigName string     `json:"source_config_name" gorm:"size:255;index;not null"`
-	Name             string     `json:"name" gorm:"size:255;index;not null"`
-	Type             string     `json:"type" gorm:"size:64;index;not null"`
-	Server           string     `json:"server" gorm:"size:255;index;not null"`
-	Port             int        `json:"port" gorm:"index;not null"`
-	Tags             string     `json:"tags" gorm:"size:255;index;not null;default:''"`
-	Fingerprint      string     `json:"-" gorm:"size:64;uniqueIndex;not null"`
-	MetadataJSON     string     `json:"metadata_json" gorm:"type:text;not null"`
-	Enabled          bool       `json:"enabled" gorm:"index;not null;default:true"`
-	LastTestStatus   string     `json:"last_test_status" gorm:"size:32;index;not null;default:unknown"`
-	LastLatencyMS    *int       `json:"last_latency_ms,omitempty"`
-	LastTestError    string     `json:"last_test_error,omitempty" gorm:"type:text"`
-	LastTestedAt     *time.Time `json:"last_tested_at,omitempty" gorm:"index"`
-	CreatedAt        time.Time  `json:"created_at" gorm:"index"`
-	UpdatedAt        time.Time  `json:"updated_at" gorm:"index"`
+	ID                   int        `json:"id" gorm:"primaryKey;autoIncrement"`
+	SourceConfigID       int        `json:"source_config_id" gorm:"index;not null"`
+	SourceConfigName     string     `json:"source_config_name" gorm:"size:255;index;not null"`
+	Name                 string     `json:"name" gorm:"size:255;index;not null"`
+	Type                 string     `json:"type" gorm:"size:64;index;not null"`
+	Server               string     `json:"server" gorm:"size:255;index;not null"`
+	Port                 int        `json:"port" gorm:"index;not null"`
+	Tags                 string     `json:"tags" gorm:"size:255;index;not null;default:''"`
+	Fingerprint          string     `json:"-" gorm:"size:64;uniqueIndex;not null"`
+	MetadataJSON         string     `json:"-" gorm:"type:text;not null"`
+	Enabled              bool       `json:"enabled" gorm:"index;not null;default:true"`
+	LastTestStatus       string     `json:"last_test_status" gorm:"size:32;index;not null;default:unknown"`
+	LastLatencyMS        *int       `json:"last_latency_ms,omitempty"`
+	LastTestError        string     `json:"last_test_error,omitempty" gorm:"type:text"`
+	LastTestedAt         *time.Time `json:"last_tested_at,omitempty" gorm:"index"`
+	ConsecutiveFailures  int        `json:"consecutive_failures" gorm:"not null;default:0"`
+	ConsecutiveSuccesses int        `json:"consecutive_successes" gorm:"not null;default:0"`
+	QuarantinedAt        *time.Time `json:"quarantined_at,omitempty" gorm:"index"`
+	CreatedAt            time.Time  `json:"created_at" gorm:"index"`
+	UpdatedAt            time.Time  `json:"updated_at" gorm:"index"`
 }
 
 type ProxyNodeListFilter struct {
 	Keyword        string
 	SourceConfigID int
 	Enabled        *bool
+	TestStatus     string
+	Quarantined    *bool
 }
 
 func ListProxyNodes(offset int, limit int, filter ProxyNodeListFilter) ([]*ProxyNode, error) {
 	if limit <= 0 {
 		limit = 10
 	}
-	query := DB.Order("id desc").Limit(limit).Offset(offset)
+	query := DB.Omit("metadata_json").Order("id desc").Limit(limit).Offset(offset)
 	if filter.Keyword != "" {
-		keyword := filter.Keyword + "%"
+		keyword := "%" + filter.Keyword + "%"
 		query = query.Where(
 			"name LIKE ? OR server LIKE ? OR type LIKE ?",
 			keyword,
@@ -53,6 +58,16 @@ func ListProxyNodes(offset int, limit int, filter ProxyNodeListFilter) ([]*Proxy
 	}
 	if filter.Enabled != nil {
 		query = query.Where("enabled = ?", *filter.Enabled)
+	}
+	if filter.TestStatus != "" {
+		query = query.Where("last_test_status = ?", filter.TestStatus)
+	}
+	if filter.Quarantined != nil {
+		if *filter.Quarantined {
+			query = query.Where("quarantined_at IS NOT NULL")
+		} else {
+			query = query.Where("quarantined_at IS NULL")
+		}
 	}
 
 	var nodes []*ProxyNode
@@ -83,6 +98,14 @@ func FindProxyNodesByIDs(ids []int) ([]*ProxyNode, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+func ListEnabledProxyNodeIDs() ([]int, error) {
+	var ids []int
+	if err := DB.Model(&ProxyNode{}).Where("enabled = ?", true).Order("id asc").Pluck("id", &ids).Error; err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 func FindExistingNodeFingerprints(fingerprints []string) (map[string]struct{}, error) {

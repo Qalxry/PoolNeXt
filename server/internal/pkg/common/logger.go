@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 )
 
 type logLevel int
@@ -27,6 +28,20 @@ var currentLogLevelName = "info"
 var commonLogWriter io.Writer = os.Stdout
 var errorLogWriter io.Writer = os.Stderr
 var defaultLogger *slog.Logger
+
+const (
+	defaultLogFileMaxBytes = int64(4 << 20)
+	defaultLogFileBackups  = 2
+)
+
+type rotatingFileWriter struct {
+	mu       sync.Mutex
+	path     string
+	maxBytes int64
+	backups  int
+	file     *os.File
+	size     int64
+}
 
 type customTextHandler struct {
 	writer io.Writer
@@ -174,13 +189,14 @@ func SetupGinLog() {
 	if *LogDir != "" {
 		commonLogPath := filepath.Join(*LogDir, "common.log")
 		errorLogPath := filepath.Join(*LogDir, "error.log")
-		commonFd, err := os.OpenFile(commonLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		commonFd, err := newRotatingFileWriter(commonLogPath, defaultLogFileMaxBytes, defaultLogFileBackups)
 		if err != nil {
 			_, _ = io.WriteString(os.Stderr, "failed to open common log file\n")
 			os.Exit(1)
 		}
-		errorFd, err := os.OpenFile(errorLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		errorFd, err := newRotatingFileWriter(errorLogPath, defaultLogFileMaxBytes, defaultLogFileBackups)
 		if err != nil {
+			_ = commonFd.Close()
 			_, _ = io.WriteString(os.Stderr, "failed to open error log file\n")
 			os.Exit(1)
 		}
@@ -190,6 +206,111 @@ func SetupGinLog() {
 	configureGinWriters()
 	defaultLogger = nil
 	ensureLogger()
+}
+
+func newRotatingFileWriter(path string, maxBytes int64, backups int) (*rotatingFileWriter, error) {
+	if maxBytes <= 0 {
+		return nil, fmt.Errorf("log max bytes must be positive")
+	}
+	if backups < 0 {
+		return nil, fmt.Errorf("log backup count cannot be negative")
+	}
+	writer := &rotatingFileWriter{
+		path:     path,
+		maxBytes: maxBytes,
+		backups:  backups,
+	}
+	if err := writer.openLocked(); err != nil {
+		return nil, err
+	}
+	if writer.size >= writer.maxBytes {
+		if err := writer.rotateLocked(); err != nil {
+			_ = writer.Close()
+			return nil, err
+		}
+	}
+	return writer, nil
+}
+
+func (writer *rotatingFileWriter) Write(payload []byte) (int, error) {
+	written := len(payload)
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
+	if writer.file == nil {
+		if err := writer.openLocked(); err != nil {
+			return 0, err
+		}
+	}
+	if int64(len(payload)) > writer.maxBytes {
+		payload = payload[len(payload)-int(writer.maxBytes):]
+	}
+	if writer.size+int64(len(payload)) > writer.maxBytes {
+		if err := writer.rotateLocked(); err != nil {
+			return 0, err
+		}
+	}
+	n, err := writer.file.Write(payload)
+	writer.size += int64(n)
+	if err != nil {
+		return n, err
+	}
+	return written, nil
+}
+
+func (writer *rotatingFileWriter) Close() error {
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
+	if writer.file == nil {
+		return nil
+	}
+	err := writer.file.Close()
+	writer.file = nil
+	return err
+}
+
+func (writer *rotatingFileWriter) openLocked() error {
+	file, err := os.OpenFile(writer.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
+		return err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return err
+	}
+	writer.file = file
+	writer.size = info.Size()
+	return nil
+}
+
+func (writer *rotatingFileWriter) rotateLocked() error {
+	if writer.file != nil {
+		if err := writer.file.Close(); err != nil {
+			return err
+		}
+		writer.file = nil
+	}
+	if writer.backups > 0 {
+		_ = os.Remove(fmt.Sprintf("%s.%d", writer.path, writer.backups))
+		for index := writer.backups - 1; index >= 1; index-- {
+			oldPath := fmt.Sprintf("%s.%d", writer.path, index)
+			newPath := fmt.Sprintf("%s.%d", writer.path, index+1)
+			if err := os.Rename(oldPath, newPath); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		}
+		if err := os.Rename(writer.path, writer.path+".1"); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	} else if err := os.Remove(writer.path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	writer.size = 0
+	return writer.openLocked()
 }
 
 func levelLabel(level slog.Level) string {

@@ -67,6 +67,174 @@ func TestAutoStartRuntimeReportsConfigurationFailure(t *testing.T) {
 	}
 }
 
+func TestAutoStartRuntimeWaitsForNodeRecoveryWhenPoolIsQuarantined(t *testing.T) {
+	setupServiceTestDB(t)
+	resetRuntimeRegistryForTest()
+
+	originalAutoStart := common.RuntimeAutoStartEnabled
+	originalKernelType := common.KernelType
+	originalBinaryPath := common.MihomoBinaryPath
+	common.RuntimeAutoStartEnabled = true
+	common.KernelType = KernelTypeMihomo
+	common.MihomoBinaryPath = "/tmp/fake-mihomo"
+	t.Cleanup(func() {
+		common.RuntimeAutoStartEnabled = originalAutoStart
+		common.KernelType = originalKernelType
+		common.MihomoBinaryPath = originalBinaryPath
+		resetRuntimeRegistryForTest()
+	})
+
+	node := seedRuntimeTestNode(t, "auto-start-quarantined-node")
+	now := time.Now()
+	if err := model.DB.Model(&model.ProxyNode{}).
+		Where("id = ?", node.ID).
+		Update("quarantined_at", now).Error; err != nil {
+		t.Fatalf("quarantine node: %v", err)
+	}
+	if _, err := CreatePortProfile(PortProfilePayload{
+		Name:             "AUTO-START-QUARANTINED",
+		ListenHost:       "127.0.0.1",
+		MixedPort:        17921,
+		ProxySettings:    model.DefaultPortProfileProxySettings(),
+		IncludeInRuntime: true,
+		NodeIDs:          []int{node.ID},
+	}); err != nil {
+		t.Fatalf("create quarantined profile: %v", err)
+	}
+
+	err := AutoStartRuntime(context.Background())
+	if !errors.Is(err, errNoRunnableProfiles) {
+		t.Fatalf("expected no-runnable-profile error, got %v", err)
+	}
+	if !runtimeRegistry.shouldResumeAfterNodeHealthRecovery() {
+		t.Fatal("expected runtime to wait for a healthy node after auto-start")
+	}
+	if runtimeRegistry.activeProcess() != nil {
+		t.Fatal("quarantined pool unexpectedly started a Mihomo process")
+	}
+}
+
+func TestNodeRecoveryResumesRuntimeStoppedForHealth(t *testing.T) {
+	setupServiceTestDB(t)
+	resetRuntimeRegistryForTest()
+
+	originalKernelType := common.KernelType
+	originalBinaryPath := common.MihomoBinaryPath
+	originalStarter := startMihomoProcess
+	originalWaiter := waitForMihomoControllerReady
+	originalRuntimeDataRoot := runtimeDataRoot
+	common.KernelType = KernelTypeMihomo
+	common.MihomoBinaryPath = "/tmp/fake-mihomo"
+	runtimeDataRoot = t.TempDir()
+	startMihomoProcess = func(binaryPath string, workDir string, configPath string, stdout io.Writer, stderr io.Writer) (*exec.Cmd, error) {
+		cmd := exec.Command("/bin/sh", "-c", "trap 'exit 0' TERM INT; while :; do sleep 1; done")
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+		if err := cmd.Start(); err != nil {
+			return nil, err
+		}
+		return cmd, nil
+	}
+	waitForMihomoControllerReady = func(ctx context.Context, controllerAddress string, secret string) error {
+		return nil
+	}
+	t.Cleanup(func() {
+		if runtimeRegistry.activeProcess() != nil {
+			_, _ = StopRuntime(context.Background())
+		}
+		common.KernelType = originalKernelType
+		common.MihomoBinaryPath = originalBinaryPath
+		startMihomoProcess = originalStarter
+		waitForMihomoControllerReady = originalWaiter
+		runtimeDataRoot = originalRuntimeDataRoot
+		resetRuntimeRegistryForTest()
+	})
+
+	node := seedRuntimeTestNode(t, "health-recovery-node")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve runtime listener: %v", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	_ = listener.Close()
+	if _, err := CreatePortProfile(PortProfilePayload{
+		Name:             "HEALTH-RECOVERY",
+		ListenHost:       "127.0.0.1",
+		MixedPort:        port,
+		ProxySettings:    model.DefaultPortProfileProxySettings(),
+		IncludeInRuntime: true,
+		NodeIDs:          []int{node.ID},
+	}); err != nil {
+		t.Fatalf("create recovery profile: %v", err)
+	}
+
+	runtimeRegistry.setResumeAfterNodeHealthRecovery(true)
+	if err := reconcileRuntimeAfterNodeChange(
+		"节点健康状态变化",
+		"node_health.runtime_reload_failed",
+		"scheduler",
+	); err != nil {
+		t.Fatalf("resume runtime after node recovery: %v", err)
+	}
+	if runtimeRegistry.activeProcess() == nil {
+		t.Fatal("expected a managed Mihomo process after node recovery")
+	}
+	if runtimeRegistry.shouldResumeAfterNodeHealthRecovery() {
+		t.Fatal("successful recovery should clear the pending resume state")
+	}
+
+	logs, err := ListAppLogs(10, 0, "system", "", "scheduler", "mihomo.resumed_after_node_recovery")
+	if err != nil {
+		t.Fatalf("list recovery logs: %v", err)
+	}
+	if len(logs.Items) != 1 || logs.Items[0].Event != "mihomo.resumed_after_node_recovery" {
+		t.Fatalf("expected runtime recovery event, got %+v", logs.Items)
+	}
+}
+
+func TestManualStopIntentCancelsPendingNodeHealthRecovery(t *testing.T) {
+	resetRuntimeRegistryForTest()
+	t.Cleanup(resetRuntimeRegistryForTest)
+
+	runtimeRegistry.operationMu.Lock()
+	runtimeRegistry.setResumeAfterNodeHealthRecovery(true)
+	started := make(chan struct{})
+	result := make(chan error, 1)
+	go func() {
+		close(started)
+		_, err := startRuntime(context.Background(), true, "node_health_recovery")
+		result <- err
+	}()
+	<-started
+	runtimeRegistry.setResumeAfterNodeHealthRecovery(false)
+	runtimeRegistry.operationMu.Unlock()
+
+	select {
+	case err := <-result:
+		if !errors.Is(err, errRuntimeRecoveryCanceled) {
+			t.Fatalf("expected canceled health recovery, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("pending health recovery did not observe the manual stop intent")
+	}
+	if runtimeRegistry.activeProcess() != nil {
+		t.Fatal("manual stop intent must prevent a recovered runtime from starting")
+	}
+}
+
+func TestHealthStopDoesNotArmRecoveryWithoutManagedProcess(t *testing.T) {
+	setupServiceTestDB(t)
+	resetRuntimeRegistryForTest()
+	t.Cleanup(resetRuntimeRegistryForTest)
+
+	if _, err := stopRuntime(context.Background(), true); err != nil {
+		t.Fatalf("stop already-stopped runtime for health reconciliation: %v", err)
+	}
+	if runtimeRegistry.shouldResumeAfterNodeHealthRecovery() {
+		t.Fatal("an already-stopped runtime must not be armed for automatic recovery")
+	}
+}
+
 func TestGetRuntimeStatusIncludesAutoStartSetting(t *testing.T) {
 	setupServiceTestDB(t)
 	resetRuntimeRegistryForTest()
@@ -913,4 +1081,5 @@ func resetRuntimeRegistryForTest() {
 	runtimeRegistry.logSeq = 0
 	runtimeRegistry.logs = nil
 	runtimeRegistry.startedAt = time.Time{}
+	runtimeRegistry.resumeAfterNodeHealthRecovery = false
 }

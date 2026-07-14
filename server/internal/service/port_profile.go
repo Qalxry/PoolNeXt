@@ -154,6 +154,7 @@ func PreviewPortProfile(payload PortProfilePayload) (*PortProfilePreview, error)
 	if err != nil {
 		return nil, err
 	}
+	runtimeNodes := selectRuntimeNodes(nodes)
 
 	profile := model.PortProfile{
 		Name:              normalized.Name,
@@ -169,16 +170,21 @@ func PreviewPortProfile(payload PortProfilePayload) (*PortProfilePreview, error)
 
 	rendered, err := runtimeconfig.RenderMihomoConfig(runtimeconfig.MihomoRenderInput{
 		Profile: profile,
-		Nodes:   nodes,
+		Nodes:   runtimeNodes,
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	runtimeNodeIDs := make([]int, 0, len(runtimeNodes))
+	for _, node := range runtimeNodes {
+		runtimeNodeIDs = append(runtimeNodeIDs, node.ID)
+	}
+
 	return &PortProfilePreview{
 		Profile:    profile,
-		NodeIDs:    normalized.NodeIDs,
-		Nodes:      nodes,
+		NodeIDs:    runtimeNodeIDs,
+		Nodes:      runtimeNodes,
 		KernelType: rendered.KernelType,
 		Checksum:   rendered.Checksum,
 		Content:    rendered.Content,
@@ -226,7 +232,7 @@ func ListProxyNodeOptions(keyword string) ([]*model.ProxyNode, error) {
 	filter := model.ProxyNodeListFilter{
 		Keyword: strings.TrimSpace(keyword),
 	}
-	items, err := model.ListProxyNodes(0, 200, filter)
+	items, err := model.ListProxyNodes(0, 1000, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -253,6 +259,7 @@ func buildPortProfileView(profile *model.PortProfile) (*model.PortProfileWithNod
 	if err != nil {
 		return nil, err
 	}
+	nodes = orderProxyNodesByIDs(nodeIDs, nodes)
 
 	var runtimeConfig *model.RuntimeConfig
 	if existing, runtimeErr := model.GetRuntimeConfigByPortProfileID(profile.ID); runtimeErr == nil {
@@ -399,6 +406,22 @@ func resolveSelectedNodes(nodeIDs []int) ([]*model.ProxyNode, error) {
 		ordered = append(ordered, nodeMap[id])
 	}
 	return ordered, nil
+}
+
+func orderProxyNodesByIDs(nodeIDs []int, nodes []*model.ProxyNode) []*model.ProxyNode {
+	nodeMap := make(map[int]*model.ProxyNode, len(nodes))
+	for _, node := range nodes {
+		if node != nil {
+			nodeMap[node.ID] = node
+		}
+	}
+	ordered := make([]*model.ProxyNode, 0, len(nodeIDs))
+	for _, id := range nodeIDs {
+		if node := nodeMap[id]; node != nil {
+			ordered = append(ordered, node)
+		}
+	}
+	return ordered
 }
 
 func replacePortProfileNodes(tx *gorm.DB, profileID int, nodeIDs []int) error {

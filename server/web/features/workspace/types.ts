@@ -39,6 +39,11 @@ export interface ProxyNodeOption {
   source_config_name: string;
   enabled: boolean;
   last_test_status: string;
+  last_latency_ms?: number;
+  last_test_error?: string;
+  last_tested_at?: string;
+  consecutive_failures: number;
+  quarantined_at?: string;
 }
 
 export interface PortProfileRecord {

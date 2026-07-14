@@ -96,6 +96,8 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			proxyNodeRoute.GET("", controller.GetProxyNodes)
 			proxyNodeRoute.GET("/options", controller.GetProxyNodeOptions)
+			proxyNodeRoute.GET("/health", controller.GetProxyNodeHealth)
+			proxyNodeRoute.POST("/health/run", controller.RunProxyNodeHealthCheck)
 			proxyNodeRoute.POST("/delete", controller.DeleteProxyNodes)
 			proxyNodeRoute.POST("/tags", controller.UpdateProxyNodeTags)
 			proxyNodeRoute.POST("/test", controller.TestProxyNodes)

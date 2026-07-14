@@ -10,17 +10,24 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 const maxNodeTestParallelism = 4
 
 var runNodeKernelTest = kernelpkg.TestNodeWithMihomo
+var nodeProbeSlots = make(chan struct{}, maxNodeTestParallelism)
 
 type ProxyNodeListInput struct {
 	Page           int
+	Offset         int
+	Limit          int
 	Keyword        string
 	SourceConfigID int
 	Enabled        *bool
+	TestStatus     string
+	Quarantined    *bool
 }
 
 type NodeTestInput struct {
@@ -40,17 +47,21 @@ type ProxyNodeTagsInput struct {
 }
 
 type NodeTestExecution struct {
-	NodeID       int        `json:"node_id"`
-	NodeName     string     `json:"node_name"`
-	Status       string     `json:"status"`
-	LatencyMS    *int       `json:"latency_ms,omitempty"`
-	ErrorMessage string     `json:"error_message,omitempty"`
-	TestURL      string     `json:"test_url,omitempty"`
-	DialAddress  string     `json:"dial_address"`
-	Cached       bool       `json:"cached"`
-	StartedAt    time.Time  `json:"started_at"`
-	FinishedAt   time.Time  `json:"finished_at"`
-	LastTestedAt *time.Time `json:"last_tested_at,omitempty"`
+	NodeID               int        `json:"node_id"`
+	NodeName             string     `json:"node_name"`
+	Status               string     `json:"status"`
+	LatencyMS            *int       `json:"latency_ms,omitempty"`
+	ErrorMessage         string     `json:"error_message,omitempty"`
+	TestURL              string     `json:"test_url,omitempty"`
+	DialAddress          string     `json:"dial_address"`
+	Cached               bool       `json:"cached"`
+	StartedAt            time.Time  `json:"started_at"`
+	FinishedAt           time.Time  `json:"finished_at"`
+	LastTestedAt         *time.Time `json:"last_tested_at,omitempty"`
+	ConsecutiveFailures  int        `json:"consecutive_failures"`
+	ConsecutiveSuccesses int        `json:"consecutive_successes"`
+	Quarantined          bool       `json:"quarantined"`
+	AvailabilityChanged  bool       `json:"availability_changed"`
 }
 
 func ListProxyNodes(input ProxyNodeListInput) ([]*model.ProxyNode, error) {
@@ -58,20 +69,45 @@ func ListProxyNodes(input ProxyNodeListInput) ([]*model.ProxyNode, error) {
 	if page < 0 {
 		page = 0
 	}
-	return model.ListProxyNodes(page*common.ItemsPerPage, common.ItemsPerPage, model.ProxyNodeListFilter{
+	limit := input.Limit
+	if limit <= 0 {
+		limit = common.ItemsPerPage
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	offset := input.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if input.Offset == 0 && page > 0 {
+		offset = page * limit
+	}
+	return model.ListProxyNodes(offset, limit, model.ProxyNodeListFilter{
 		Keyword:        strings.TrimSpace(input.Keyword),
 		SourceConfigID: input.SourceConfigID,
 		Enabled:        input.Enabled,
+		TestStatus:     normalizeNodeTestStatusFilter(input.TestStatus),
+		Quarantined:    input.Quarantined,
 	})
 }
 
 func SetProxyNodeEnabled(id int, enabled bool) error {
-	node, err := model.GetProxyNodeByID(id)
-	if err != nil {
+	var node model.ProxyNode
+	if err := model.DB.Select("id", "enabled").First(&node, "id = ?", id).Error; err != nil {
 		return fmt.Errorf("节点不存在")
 	}
-	node.Enabled = enabled
-	return model.DB.Save(node).Error
+	if node.Enabled == enabled {
+		return nil
+	}
+	result := model.DB.Model(&model.ProxyNode{}).Where("id = ?", id).Update("enabled", enabled)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("节点不存在")
+	}
+	return reloadRuntimeAfterNodeSetChange("节点启用状态变化")
 }
 
 func DeleteProxyNode(id int) error {
@@ -81,7 +117,10 @@ func DeleteProxyNode(id int) error {
 	if _, err := model.GetProxyNodeByID(id); err != nil {
 		return fmt.Errorf("节点不存在")
 	}
-	return model.DeleteProxyNodeByID(id)
+	if _, err := deleteProxyNodesWithRelations([]int{id}); err != nil {
+		return err
+	}
+	return reloadRuntimeAfterNodeSetChange("节点删除")
 }
 
 func DeleteProxyNodes(ids []int) (int, error) {
@@ -89,8 +128,8 @@ func DeleteProxyNodes(ids []int) (int, error) {
 		return 0, fmt.Errorf("请先选择要删除的节点")
 	}
 
-	deleted := 0
 	seen := make(map[int]struct{}, len(ids))
+	validIDs := make([]int, 0, len(ids))
 	for _, id := range ids {
 		if id <= 0 {
 			continue
@@ -99,15 +138,66 @@ func DeleteProxyNodes(ids []int) (int, error) {
 			continue
 		}
 		seen[id] = struct{}{}
-		if err := DeleteProxyNode(id); err != nil {
-			return deleted, err
-		}
-		deleted++
+		validIDs = append(validIDs, id)
 	}
-	if deleted == 0 {
+	if len(validIDs) == 0 {
 		return 0, fmt.Errorf("请先选择要删除的节点")
 	}
+	deleted, err := deleteProxyNodesWithRelations(validIDs)
+	if err != nil {
+		return 0, err
+	}
+	if err := reloadRuntimeAfterNodeSetChange("节点批量删除"); err != nil {
+		return deleted, err
+	}
 	return deleted, nil
+}
+
+func deleteProxyNodesWithRelations(ids []int) (int, error) {
+	deleted := 0
+	err := model.DB.Transaction(func(tx *gorm.DB) error {
+		var profileIDs []int
+		if err := tx.Model(&model.PortProfileNode{}).
+			Where("proxy_node_id IN ?", ids).
+			Distinct("port_profile_id").
+			Pluck("port_profile_id", &profileIDs).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("proxy_node_id IN ?", ids).Delete(&model.PortProfileNode{}).Error; err != nil {
+			return err
+		}
+		if len(profileIDs) > 0 {
+			for _, profileID := range profileIDs {
+				var remaining int64
+				if err := tx.Model(&model.PortProfileNode{}).
+					Where("port_profile_id = ?", profileID).
+					Count(&remaining).Error; err != nil {
+					return err
+				}
+				if remaining == 0 {
+					if err := tx.Model(&model.PortProfile{}).
+						Where("id = ?", profileID).
+						Update("include_in_runtime", false).Error; err != nil {
+						return err
+					}
+				}
+			}
+			if err := tx.Where("port_profile_id IN ?", profileIDs).Delete(&model.RuntimeConfig{}).Error; err != nil {
+				return err
+			}
+		}
+
+		result := tx.Delete(&model.ProxyNode{}, "id IN ?", ids)
+		if result.Error != nil {
+			return result.Error
+		}
+		deleted = int(result.RowsAffected)
+		if deleted == 0 {
+			return fmt.Errorf("未找到可删除的节点")
+		}
+		return nil
+	})
+	return deleted, err
 }
 
 func UpdateProxyNodeTags(ids []int, tags string) (int, error) {
@@ -126,6 +216,10 @@ func UpdateProxyNodeTags(ids []int, tags string) (int, error) {
 }
 
 func ExecuteNodeTests(ctx context.Context, input NodeTestInput) ([]NodeTestExecution, error) {
+	return executeNodeTests(ctx, input, maxNodeTestParallelism)
+}
+
+func executeNodeTests(ctx context.Context, input NodeTestInput, parallelism int) ([]NodeTestExecution, error) {
 	if len(input.NodeIDs) == 0 {
 		return nil, fmt.Errorf("请先选择要测试的节点")
 	}
@@ -149,7 +243,7 @@ func ExecuteNodeTests(ctx context.Context, input NodeTestInput) ([]NodeTestExecu
 	}
 	jobs := make(chan int)
 	resultsCh := make(chan indexedExecution, len(nodes))
-	workerCount := minNodeTestWorkerCount(len(nodes), maxNodeTestParallelism)
+	workerCount := minNodeTestWorkerCount(len(nodes), parallelism)
 	if workerCount <= 0 {
 		workerCount = 1
 	}
@@ -160,7 +254,7 @@ func ExecuteNodeTests(ctx context.Context, input NodeTestInput) ([]NodeTestExecu
 			defer wg.Done()
 			for index := range jobs {
 				node := nodes[index]
-				execution := buildNodeTestExecution(ctx, node, timeout, testURL)
+				execution := buildNodeTestExecutionWithSlot(ctx, node, timeout, testURL)
 				resultsCh <- indexedExecution{index: index, item: execution}
 			}
 		}()
@@ -181,11 +275,13 @@ func ExecuteNodeTests(ctx context.Context, input NodeTestInput) ([]NodeTestExecu
 		return ordered[left].index < ordered[right].index
 	})
 	for _, item := range ordered {
-		if err := persistNodeTestExecution(item.item.NodeID, item.item); err != nil {
+		execution, err := persistNodeTestExecution(item.item.NodeID, item.item)
+		if err != nil {
 			return nil, err
 		}
-		results = append(results, item.item)
+		results = append(results, execution)
 	}
+	reloadRuntimeAfterNodeHealthChanges(results)
 
 	return results, nil
 }
@@ -248,6 +344,29 @@ func buildNodeTestExecution(ctx context.Context, node *model.ProxyNode, timeout 
 	})
 }
 
+func buildNodeTestExecutionWithSlot(ctx context.Context, node *model.ProxyNode, timeout time.Duration, testURL string) NodeTestExecution {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	select {
+	case nodeProbeSlots <- struct{}{}:
+		defer func() { <-nodeProbeSlots }()
+	case <-ctx.Done():
+		now := time.Now()
+		return NodeTestExecution{
+			NodeID:       node.ID,
+			NodeName:     node.Name,
+			Status:       model.NodeTestStatusUnknown,
+			ErrorMessage: ctx.Err().Error(),
+			TestURL:      testURL,
+			DialAddress:  fmt.Sprintf("%s:%d", node.Server, node.Port),
+			StartedAt:    now,
+			FinishedAt:   now,
+		}
+	}
+	return buildNodeTestExecution(ctx, node, timeout, testURL)
+}
+
 func normalizeNodeTestTimeout(timeoutMS int) time.Duration {
 	if timeoutMS <= 0 {
 		timeoutMS = common.NodeTestDefaultTimeoutMS
@@ -273,16 +392,6 @@ func normalizeNodeTestURL(testURL string) string {
 	return value
 }
 
-func persistNodeTestExecution(nodeID int, execution NodeTestExecution) error {
-	updates := map[string]any{
-		"last_test_status": execution.Status,
-		"last_latency_ms":  execution.LatencyMS,
-		"last_test_error":  execution.ErrorMessage,
-		"last_tested_at":   execution.LastTestedAt,
-	}
-	return model.DB.Model(&model.ProxyNode{}).Where("id = ?", nodeID).Updates(updates).Error
-}
-
 func normalizeProxyNodeTags(tags string) string {
 	if strings.TrimSpace(tags) == "" {
 		return ""
@@ -304,6 +413,15 @@ func normalizeProxyNodeTags(tags string) string {
 		result = append(result, tag)
 	}
 	return strings.Join(result, ", ")
+}
+
+func normalizeNodeTestStatusFilter(value string) string {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case model.NodeTestStatusUnknown, model.NodeTestStatusSuccess, model.NodeTestStatusFailed:
+		return strings.TrimSpace(strings.ToLower(value))
+	default:
+		return ""
+	}
 }
 
 func minNodeTestWorkerCount(left int, right int) int {

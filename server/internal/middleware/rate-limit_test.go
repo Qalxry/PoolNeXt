@@ -83,6 +83,31 @@ func TestSlidingWindowLimiterToleratesOutOfOrderTimestamps(t *testing.T) {
 	}
 }
 
+func TestStaticWebAssetsBypassGlobalWebRateLimit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		method string
+		path   string
+		want   bool
+	}{
+		{method: http.MethodGet, path: "/_next/static/chunks/app/log.js", want: true},
+		{method: http.MethodGet, path: "/zashboard/assets/index.js", want: true},
+		{method: http.MethodGet, path: "/zashboard/sw.js", want: true},
+		{method: http.MethodHead, path: "/favicon.ico", want: true},
+		{method: http.MethodGet, path: "/nodes", want: false},
+		{method: http.MethodGet, path: "/workspace.txt", want: false},
+		{method: http.MethodPost, path: "/asset.js", want: false},
+	}
+
+	for _, test := range tests {
+		request := httptest.NewRequest(test.method, test.path, nil)
+		if got := isStaticWebAssetRequest(request); got != test.want {
+			t.Errorf("isStaticWebAssetRequest(%s %q) = %v, want %v", test.method, test.path, got, test.want)
+		}
+	}
+}
+
 func TestRedisSlidingWindowLimiterIsAtomicUnderConcurrency(t *testing.T) {
 	t.Parallel()
 
@@ -186,6 +211,7 @@ func TestExpensiveOperationClassification(t *testing.T) {
 	}{
 		{method: http.MethodPost, path: "/api/runtime/start", want: true},
 		{method: http.MethodPost, path: "/api/source-configs/test", want: true},
+		{method: http.MethodPost, path: "/api/proxy-nodes/health/run", want: true},
 		{method: http.MethodPost, path: "/api/port-profiles/42/runtime/save", want: true},
 		{method: http.MethodPost, path: "/api/runtime/stop", want: false},
 		{method: http.MethodGet, path: "/api/runtime/status", want: false},

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	pathpkg "path"
 	"sort"
 	"strings"
 	"sync"
@@ -182,7 +183,32 @@ func rateLimitFactory(maxRequestNum int, duration int64, mark string) gin.Handle
 }
 
 func GlobalWebRateLimit() gin.HandlerFunc {
-	return rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW")
+	limiter := rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW")
+	return func(c *gin.Context) {
+		if isStaticWebAssetRequest(c.Request) {
+			c.Next()
+			return
+		}
+		limiter(c)
+	}
+}
+
+func isStaticWebAssetRequest(request *http.Request) bool {
+	if request == nil || (request.Method != http.MethodGet && request.Method != http.MethodHead) {
+		return false
+	}
+
+	requestPath := request.URL.Path
+	if strings.HasPrefix(requestPath, "/_next/static/") || strings.HasPrefix(requestPath, "/zashboard/assets/") {
+		return true
+	}
+
+	switch strings.ToLower(pathpkg.Ext(requestPath)) {
+	case ".css", ".gif", ".ico", ".jpeg", ".jpg", ".js", ".map", ".png", ".svg", ".ttf", ".wasm", ".webmanifest", ".webp", ".woff", ".woff2":
+		return true
+	default:
+		return false
+	}
 }
 
 func GlobalAPIRateLimit() gin.HandlerFunc {
@@ -248,6 +274,7 @@ func isExpensiveOperation(method string, requestPath string) bool {
 		"/api/source-configs/parse-url",
 		"/api/source-configs/test",
 		"/api/source-configs/import",
+		"/api/proxy-nodes/health/run",
 		"/api/proxy-nodes/test",
 		"/api/runtime/start",
 		"/api/runtime/reload":

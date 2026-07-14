@@ -11,7 +11,14 @@ func GetAppLogs(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	afterID, _ := strconv.Atoi(c.DefaultQuery("after_id", "0"))
 
-	logs, err := service.ListAppLogs(limit, afterID, c.Query("classification"))
+	logs, err := service.ListAppLogs(
+		limit,
+		afterID,
+		c.Query("classification"),
+		c.Query("level"),
+		c.Query("source"),
+		c.Query("keyword"),
+	)
 	if err != nil {
 		respondFailure(c, err.Error())
 		return

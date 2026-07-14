@@ -5,7 +5,10 @@ export interface AppLogItem {
   id: number;
   classification: string;
   level: string;
+  event: string;
+  source: string;
   message: string;
+  details: Record<string, string>;
   created_at: string;
 }
 

@@ -177,6 +177,7 @@ async function smokeProfile(context, baseURL, profileName) {
   const consoleErrors = []
   const pageErrors = []
   const staticFailures = []
+  const apiFailures = []
   const loadedStaticAssets = new Set()
 
   page.on('console', (message) => {
@@ -189,10 +190,15 @@ async function smokeProfile(context, baseURL, profileName) {
     }
   })
   page.on('response', (response) => {
-    if (!isStaticAsset(response.url())) return
-    loadedStaticAssets.add(new URL(response.url()).pathname)
-    if (response.status() >= 400) {
-      staticFailures.push(`${response.url()}: HTTP ${response.status()}`)
+    const pathname = new URL(response.url()).pathname
+    if (pathname.startsWith('/api/') && response.status() >= 400) {
+      apiFailures.push(`${response.request().method()} ${pathname}: HTTP ${response.status()}`)
+    }
+    if (isStaticAsset(response.url())) {
+      loadedStaticAssets.add(pathname)
+      if (response.status() >= 400) {
+        staticFailures.push(`${response.url()}: HTTP ${response.status()}`)
+      }
     }
   })
 
@@ -232,6 +238,47 @@ async function smokeProfile(context, baseURL, profileName) {
     )
   ) {
     throw new Error(`${profileName}: WebUI did not load a Next.js JavaScript chunk`)
+  }
+
+  const affectedRoutes = [
+    ['/nodes', '节点池'],
+    ['/workspace', '工作台'],
+    ['/runtime', '内核'],
+    ['/log', '事件日志'],
+    ['/setting', '设置'],
+  ]
+  for (const [pathname, heading] of affectedRoutes) {
+    const response = await page.goto(`${baseURL}${pathname}`, { waitUntil: 'networkidle' })
+    if (!response?.ok()) {
+      const status = response?.status() ?? 'no response'
+      const bodyText = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim()
+      throw new Error(
+        [
+          `${profileName}: ${pathname} failed to load with ${status}`,
+          `current URL: ${page.url()}`,
+          `body: ${bodyText.slice(0, 1000) || '<empty>'}`,
+          apiFailures.length > 0 ? `API failures: ${apiFailures.join('; ')}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      )
+    }
+    try {
+      await page.getByRole('heading', { level: 1, name: heading }).waitFor({ state: 'visible' })
+    } catch (error) {
+      const bodyText = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim()
+      const diagnostics = [
+        `${profileName}: ${pathname} did not render heading ${JSON.stringify(heading)}`,
+        `current URL: ${page.url()}`,
+        `body: ${bodyText.slice(0, 1000) || '<empty>'}`,
+      ]
+      if (apiFailures.length > 0) diagnostics.push(`API failures: ${apiFailures.join('; ')}`)
+      if (consoleErrors.length > 0) {
+        diagnostics.push(`console errors: ${consoleErrors.join('; ')}`)
+      }
+      if (pageErrors.length > 0) diagnostics.push(`page errors: ${pageErrors.join('; ')}`)
+      throw new Error(diagnostics.join('\n'), { cause: error })
+    }
   }
 
   const zashboardResponse = await page.goto(`${baseURL}/zashboard/`, { waitUntil: 'networkidle' })

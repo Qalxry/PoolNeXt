@@ -8,42 +8,34 @@ import {
   formatDateTimeWithMilliseconds,
 } from '@/lib/utils/date';
 
-type ClassificationMeta = { label: string; tone: string; dot: string };
-type LevelMeta = { label: string };
+type ClassificationMeta = {
+  label: string;
+  variant: 'success' | 'warning' | 'danger' | 'info';
+};
+
+type LevelMeta = {
+  label: string;
+  variant: 'success' | 'warning' | 'danger' | 'info';
+};
 
 const classificationMeta: Record<LogClassification, ClassificationMeta> = {
-  system: {
-    label: '系统日志',
-    tone: 'bg-sky-100 text-sky-700',
-    dot: 'bg-sky-300',
-  },
-  business: {
-    label: '业务日志',
-    tone: 'bg-emerald-100 text-emerald-700',
-    dot: 'bg-emerald-300',
-  },
-  security: {
-    label: '安全日志',
-    tone: 'bg-rose-100 text-rose-700',
-    dot: 'bg-rose-300',
-  },
+  system: { label: '系统日志', variant: 'info' },
+  business: { label: '业务日志', variant: 'success' },
+  security: { label: '安全日志', variant: 'danger' },
 };
 
 const levelMeta: Record<LogLevel, LevelMeta> = {
-  debug: { label: 'DEBUG' },
-  info: { label: 'INFO' },
-  warn: { label: 'WARN' },
-  error: { label: 'ERROR' },
+  debug: { label: 'DEBUG', variant: 'info' },
+  info: { label: 'INFO', variant: 'success' },
+  warn: { label: 'WARN', variant: 'warning' },
+  error: { label: 'ERROR', variant: 'danger' },
 };
 
-const unknownClassificationMeta: ClassificationMeta = {
-  label: '未知分类',
-  tone: 'bg-slate-100 text-slate-700',
-  dot: 'bg-slate-300',
-};
-
-const unknownLevelMeta: LevelMeta = {
-  label: 'UNKNOWN',
+const sourceLabels: Record<string, string> = {
+  backend: '后端',
+  frontend: '前端',
+  mihomo: 'Mihomo',
+  scheduler: '调度器',
 };
 
 function isLogClassification(value: string): value is LogClassification {
@@ -58,12 +50,9 @@ export function getClassificationMeta(classification: string) {
   if (isLogClassification(classification)) {
     return classificationMeta[classification];
   }
-
   return {
-    ...unknownClassificationMeta,
-    label: classification
-      ? `${unknownClassificationMeta.label}(${classification})`
-      : unknownClassificationMeta.label,
+    label: classification ? `未知分类(${classification})` : '未知分类',
+    variant: 'warning' as const,
   };
 }
 
@@ -71,16 +60,31 @@ export function getLevelMeta(level: string) {
   if (isLogLevel(level)) {
     return levelMeta[level];
   }
-
   return {
-    label: level
-      ? `${unknownLevelMeta.label}(${level.toUpperCase()})`
-      : unknownLevelMeta.label,
+    label: level ? `UNKNOWN(${level.toUpperCase()})` : 'UNKNOWN',
+    variant: 'warning' as const,
   };
 }
 
+export function getSourceLabel(source: string) {
+  return (sourceLabels[source] ?? source) || '未知来源';
+}
+
 export function formatLogLine(item: AppLogItem) {
-  return `${formatDateTimeWithMilliseconds(item.created_at)} | ${getClassificationMeta(item.classification).label} | ${getLevelMeta(item.level).label} | ${item.message}`;
+  const details = Object.entries(item.details ?? {})
+    .map(([key, value]) => `${key}=${value}`)
+    .join(' | ');
+  return [
+    formatDateTimeWithMilliseconds(item.created_at),
+    getClassificationMeta(item.classification).label,
+    getLevelMeta(item.level).label,
+    getSourceLabel(item.source),
+    item.event || 'general',
+    item.message,
+    details,
+  ]
+    .filter(Boolean)
+    .join(' | ');
 }
 
 export function matchesLogKeyword(item: AppLogItem, keyword: string) {
@@ -89,20 +93,21 @@ export function matchesLogKeyword(item: AppLogItem, keyword: string) {
     return true;
   }
 
-  const classificationLabel = getClassificationMeta(
+  const detailText = Object.entries(item.details ?? {})
+    .map(([key, value]) => `${key} ${value}`)
+    .join(' ')
+    .toLowerCase();
+  return [
+    item.message,
+    item.event,
+    item.source,
+    getSourceLabel(item.source),
     item.classification,
-  ).label.toLowerCase();
-  const levelLabel = getLevelMeta(item.level).label.toLowerCase();
-
-  return (
-    item.message.toLowerCase().includes(normalizedKeyword) ||
-    item.classification.toLowerCase().includes(normalizedKeyword) ||
-    classificationLabel.includes(normalizedKeyword) ||
-    item.level.toLowerCase().includes(normalizedKeyword) ||
-    levelLabel.includes(normalizedKeyword) ||
-    formatDateTime(item.created_at).toLowerCase().includes(normalizedKeyword) ||
-    formatDateTimeWithMilliseconds(item.created_at)
-      .toLowerCase()
-      .includes(normalizedKeyword)
-  );
+    getClassificationMeta(item.classification).label,
+    item.level,
+    getLevelMeta(item.level).label,
+    detailText,
+    formatDateTime(item.created_at),
+    formatDateTimeWithMilliseconds(item.created_at),
+  ].some((value) => value.toLowerCase().includes(normalizedKeyword));
 }

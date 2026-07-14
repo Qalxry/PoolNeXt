@@ -19,21 +19,21 @@ export function AppCard({
   return (
     <section
       className={cn(
-        'rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-card)]/90 shadow-[var(--shadow-soft)] backdrop-blur',
+        'rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-soft)]',
         className,
       )}
       {...props}
     >
       {(title || description || action) && (
-        <header className="flex flex-col gap-3 border-b border-[var(--border-default)] px-6 py-5 md:flex-row md:items-start md:justify-between">
+        <header className="flex flex-col gap-2 border-b border-[var(--border-default)] px-4 py-3 md:flex-row md:items-start md:justify-between">
           <div className="space-y-1">
             {title ? (
-              <h2 className="text-lg font-semibold text-[var(--foreground-primary)]">
+              <h2 className="text-sm font-semibold text-[var(--foreground-primary)]">
                 {title}
               </h2>
             ) : null}
             {description ? (
-              <p className="text-sm leading-6 text-[var(--foreground-secondary)]">
+              <p className="text-xs leading-5 text-[var(--foreground-secondary)]">
                 {description}
               </p>
             ) : null}
@@ -41,7 +41,7 @@ export function AppCard({
           {action ? <div className="shrink-0">{action}</div> : null}
         </header>
       )}
-      <div className="px-6 py-5">{children}</div>
+      <div className="px-4 py-4">{children}</div>
     </section>
   );
 }

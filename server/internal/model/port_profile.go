@@ -43,7 +43,7 @@ type PortProfileProxySettings struct {
 
 func DefaultPortProfileProxySettings() PortProfileProxySettings {
 	return PortProfileProxySettings{
-		StrategyType:        PortProfileStrategySelect,
+		StrategyType:        PortProfileStrategyFallback,
 		TestURL:             "https://cp.cloudflare.com/generate_204",
 		TestIntervalSeconds: 300,
 		LoadBalanceStrategy: "consistent-hashing",

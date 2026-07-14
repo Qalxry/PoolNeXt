@@ -8,12 +8,18 @@ import type {
 
 type GetLogsParams = {
   classification?: LogClassification | 'all';
+  level?: LogLevel | 'all';
+  source?: string | 'all';
+  keyword?: string;
   afterId?: number;
   limit?: number;
 };
 
 export function getLogs({
   classification = 'all',
+  level = 'all',
+  source = 'all',
+  keyword = '',
   afterId = 0,
   limit = 100,
 }: GetLogsParams = {}) {
@@ -27,6 +33,15 @@ export function getLogs({
 
   if (classification !== 'all') {
     searchParams.set('classification', classification);
+  }
+  if (level !== 'all') {
+    searchParams.set('level', level);
+  }
+  if (source !== 'all') {
+    searchParams.set('source', source);
+  }
+  if (keyword.trim()) {
+    searchParams.set('keyword', keyword.trim());
   }
 
   return apiRequest<AppLogList>(`/log/?${searchParams.toString()}`);

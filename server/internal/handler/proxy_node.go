@@ -21,6 +21,8 @@ type proxyNodeStatusRequest struct {
 // @Router /api/proxy-nodes [get]
 func GetProxyNodes(c *gin.Context) {
 	page, _ := strconv.Atoi(c.Query("p"))
+	offset, _ := strconv.Atoi(c.Query("offset"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
 	sourceConfigID, _ := strconv.Atoi(c.Query("source_config_id"))
 
 	var enabled *bool
@@ -29,17 +31,47 @@ func GetProxyNodes(c *gin.Context) {
 		enabled = &parsed
 	}
 
+	var quarantined *bool
+	if value := strings.TrimSpace(c.Query("quarantined")); value != "" {
+		parsed := value == "true" || value == "1"
+		quarantined = &parsed
+	}
+
 	nodes, err := service.ListProxyNodes(service.ProxyNodeListInput{
 		Page:           page,
+		Offset:         offset,
+		Limit:          limit,
 		Keyword:        c.Query("keyword"),
 		SourceConfigID: sourceConfigID,
 		Enabled:        enabled,
+		TestStatus:     c.Query("test_status"),
+		Quarantined:    quarantined,
 	})
 	if err != nil {
 		respondFailure(c, err.Error())
 		return
 	}
 	respondSuccess(c, nodes)
+}
+
+func GetProxyNodeHealth(c *gin.Context) {
+	summary, err := service.GetNodeHealthSummary()
+	if err != nil {
+		respondFailure(c, err.Error())
+		return
+	}
+	respondSuccess(c, summary)
+}
+
+func RunProxyNodeHealthCheck(c *gin.Context) {
+	result, err := service.RunNodeHealthCheck(c.Request.Context())
+	if err != nil {
+		_ = service.AppLog.Push(model.AppLogClassificationBusiness, model.AppLogLevelWarn, "manual proxy node health check failed | username="+c.GetString("username")+" | reason="+err.Error())
+		respondFailure(c, err.Error())
+		return
+	}
+	_ = service.AppLog.Push(model.AppLogClassificationBusiness, model.AppLogLevelInfo, "manual proxy node health check completed | username="+c.GetString("username")+" | checked="+strconv.Itoa(result.Checked)+" | failed="+strconv.Itoa(result.Failed))
+	respondSuccess(c, result)
 }
 
 // UpdateProxyNodeStatus godoc

@@ -124,19 +124,19 @@ function SidebarNavItem({
   const showLabel = forceExpanded || !isSidebarCollapsed;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <Link
         href={item.href}
         onClick={onNavigate}
         className={cn(
-          'flex min-h-[50px] items-center gap-3 rounded-2xl border px-3 py-2.5 transition-colors',
-          depth > 0 && 'ml-3 rounded-xl',
+          'flex min-h-10 items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors',
+          depth > 0 && 'ml-3',
           active
             ? 'border-[var(--border-strong)] bg-[var(--accent-soft)] text-[var(--foreground-primary)]'
             : 'border-transparent text-[var(--foreground-secondary)] hover:border-[var(--border-default)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground-primary)]',
         )}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--control-background)] text-[var(--foreground-primary)]">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--control-background)] text-[var(--foreground-primary)]">
           <SidebarIcon icon={item.icon} />
         </span>
         {showLabel ? (
@@ -146,7 +146,7 @@ function SidebarNavItem({
         ) : null}
       </Link>
       {showLabel && hasChildren ? (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {item.children?.map((child) => (
             <SidebarNavItem
               key={child.href}
@@ -178,9 +178,9 @@ function SidebarContent({
   const showLabel = forceExpanded || !isSidebarCollapsed;
 
   return (
-    <div className="flex h-full flex-col gap-5">
-      <div className="flex items-center gap-3 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] px-3 py-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--brand-primary-soft)] text-sm font-semibold text-[var(--brand-primary)]">
+    <div className="flex h-full flex-col gap-3">
+      <div className="flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-muted)] px-2 py-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--brand-primary-soft)] text-xs font-semibold text-[var(--brand-primary)]">
           PN
         </div>
         {showLabel ? (
@@ -195,8 +195,8 @@ function SidebarContent({
         ) : null}
       </div>
 
-      <nav className="flex-1 space-y-2">
-        <div className="flex max-h-full min-h-0 flex-col gap-2 overflow-y-auto pr-1">
+      <nav className="flex-1 space-y-1">
+        <div className="flex max-h-full min-h-0 flex-col gap-1 overflow-y-auto pr-1">
           {dashboardNavigation.map((item) => (
             <SidebarNavItem
               key={item.href}
@@ -243,7 +243,7 @@ export function DashboardSidebar() {
 
       <aside
         className={cn(
-          'fixed top-0 left-0 z-40 h-screen w-[200px] overflow-hidden border-r border-[var(--border-default)] bg-[var(--surface-panel)]/95 px-3 py-5 backdrop-blur transition-transform duration-200 min-[1000px]:hidden',
+          'fixed top-0 left-0 z-40 h-screen w-[216px] overflow-hidden border-r border-[var(--border-default)] bg-[var(--surface-panel)]/95 px-3 py-3 backdrop-blur transition-transform duration-200 min-[1000px]:hidden',
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -257,8 +257,8 @@ export function DashboardSidebar() {
 
       <aside
         className={cn(
-          'sticky top-0 z-10 hidden h-screen shrink-0 overflow-hidden border-r border-[var(--border-default)] bg-[var(--surface-panel)]/95 px-3 py-5 backdrop-blur min-[1000px]:block',
-          isSidebarCollapsed ? 'w-[76px]' : 'w-[200px]',
+          'sticky top-0 z-10 hidden h-screen shrink-0 overflow-hidden border-r border-[var(--border-default)] bg-[var(--surface-panel)]/95 px-2 py-3 backdrop-blur min-[1000px]:block',
+          isSidebarCollapsed ? 'w-[64px]' : 'w-[216px]',
         )}
       >
         <SidebarContent

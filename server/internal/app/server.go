@@ -157,11 +157,16 @@ func RunServer(assetFS fs.FS, buildDir string, indexPage []byte, zashboardDir st
 	defer stopSignals()
 	runtimeContext, cancelRuntime := context.WithCancel(signalContext)
 	autoStartDone := make(chan struct{})
+	healthSchedulerDone := make(chan struct{})
 	go func() {
 		defer close(autoStartDone)
 		if startErr := service.AutoStartRuntime(runtimeContext); startErr != nil {
 			slog.Warn("automatic Mihomo startup failed; web service remains available", "error", startErr)
 		}
+	}()
+	go func() {
+		defer close(healthSchedulerDone)
+		service.RunNodeHealthScheduler(runtimeContext)
 	}()
 
 	slog.Info(
@@ -187,6 +192,7 @@ func RunServer(assetFS fs.FS, buildDir string, indexPage []byte, zashboardDir st
 	serveErr := serveHTTP(signalContext, httpServer, httpConfig.ShutdownTimeout)
 	cancelRuntime()
 	<-autoStartDone
+	<-healthSchedulerDone
 
 	runtimeShutdownContext, cancelRuntimeShutdown := context.WithTimeout(context.Background(), httpConfig.ShutdownTimeout)
 	status, statusErr := service.GetRuntimeStatus(runtimeShutdownContext)

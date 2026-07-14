@@ -10,6 +10,7 @@ import { LoadingState } from '@/components/feedback/loading-state';
 import { PageHeader } from '@/components/layout/page-header';
 import { AppCard } from '@/components/ui/app-card';
 import { Label } from '@/components/ui/label';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import { getKernelCapability } from '@/features/capability/api/capability';
 import {
@@ -33,6 +34,7 @@ import type {
   PortProfilePreview,
   PortProfileStrategy,
   PortProfileTemplateItem,
+  ProxyNodeOption,
 } from '@/features/workspace/types';
 import {
   CodeBlock,
@@ -51,7 +53,7 @@ const defaultSocksPort = 7891;
 const defaultHTTPPort = 7892;
 
 const defaultProxySettings: PortProfileProxySettings = {
-  strategy_type: 'select',
+  strategy_type: 'fallback',
   test_url: 'https://cp.cloudflare.com/generate_204',
   test_interval_seconds: 300,
   load_balance_strategy: 'consistent-hashing',
@@ -101,7 +103,7 @@ function normalizeProxySettings(
   value?: Partial<PortProfileProxySettings> | null,
 ): PortProfileProxySettings {
   return {
-    strategy_type: value?.strategy_type ?? 'select',
+    strategy_type: value?.strategy_type ?? 'fallback',
     test_url: value?.test_url ?? 'https://cp.cloudflare.com/generate_204',
     test_interval_seconds: value?.test_interval_seconds ?? 300,
     load_balance_strategy: value?.load_balance_strategy ?? 'consistent-hashing',
@@ -125,6 +127,22 @@ function toProfilePayload(item: PortProfileWithNodes): PortProfilePayload {
     include_in_runtime: item.profile.include_in_runtime,
     node_ids: item.node_ids,
   };
+}
+
+function getNodeStatus(node: ProxyNodeOption) {
+  if (!node.enabled) {
+    return { label: '已禁用', variant: 'warning' as const };
+  }
+  if (node.quarantined_at) {
+    return { label: '已隔离', variant: 'danger' as const };
+  }
+  if (node.last_test_status === 'success') {
+    return { label: '可用', variant: 'success' as const };
+  }
+  if (node.last_test_status === 'failed') {
+    return { label: '失败', variant: 'danger' as const };
+  }
+  return { label: '待检测', variant: 'info' as const };
 }
 
 export function WorkspacePage() {
@@ -328,11 +346,29 @@ export function WorkspacePage() {
 
   const profileList = profilesQuery.data ?? [];
   const templateList = templatesQuery.data ?? [];
-  const nodeOptions = nodeOptionsQuery.data ?? [];
-  const selectedNodeSet = useMemo(
-    () => new Set(payload.node_ids),
-    [payload.node_ids],
+  const nodeOptions = useMemo(
+    () => nodeOptionsQuery.data ?? [],
+    [nodeOptionsQuery.data],
   );
+  const displayedNodeOptions = useMemo(() => {
+    const selectedOrder = new Map(
+      payload.node_ids.map((nodeId, index) => [nodeId, index]),
+    );
+    return [...nodeOptions].sort((left, right) => {
+      const leftOrder = selectedOrder.get(left.id);
+      const rightOrder = selectedOrder.get(right.id);
+      if (leftOrder !== undefined && rightOrder !== undefined) {
+        return leftOrder - rightOrder;
+      }
+      if (leftOrder !== undefined) {
+        return -1;
+      }
+      if (rightOrder !== undefined) {
+        return 1;
+      }
+      return left.name.localeCompare(right.name, 'zh-CN');
+    });
+  }, [nodeOptions, payload.node_ids]);
   const capability = capabilityQuery.data;
 
   const handleCreateNew = () => {
@@ -352,11 +388,44 @@ export function WorkspacePage() {
     }));
   };
 
+  const handleMoveNode = (nodeId: number, offset: -1 | 1) => {
+    setPayload((current) => {
+      const index = current.node_ids.indexOf(nodeId);
+      const nextIndex = index + offset;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.node_ids.length) {
+        return current;
+      }
+      const nodeIds = [...current.node_ids];
+      [nodeIds[index], nodeIds[nextIndex]] = [
+        nodeIds[nextIndex],
+        nodeIds[index],
+      ];
+      return { ...current, node_ids: nodeIds };
+    });
+  };
+
+  const selectVisibleAvailableNodes = () => {
+    const availableIds = displayedNodeOptions
+      .filter((node) => node.enabled && !node.quarantined_at)
+      .map((node) => node.id);
+    setPayload((current) => ({
+      ...current,
+      node_ids: Array.from(new Set([...current.node_ids, ...availableIds])),
+    }));
+  };
+
   const strategyDescription = {
     select: '手动选择固定出口',
     'url-test': '按 URL 延迟自动选择',
-    fallback: '按优先级与可用性自动切换',
+    fallback:
+      '按优先级选择可用节点，连接失败后由 Mihomo 更新健康状态并切换后续连接',
     'load-balance': '按负载均衡策略分散请求，可切换一致性哈希或轮询',
+  } satisfies Record<PortProfileStrategy, string>;
+  const strategyLabel = {
+    select: '手动选择',
+    'url-test': '最低延迟',
+    fallback: '故障切换',
+    'load-balance': '负载均衡',
   } satisfies Record<PortProfileStrategy, string>;
 
   const applyTemplate = (item: PortProfileTemplateItem) => {
@@ -622,7 +691,7 @@ export function WorkspacePage() {
                   placeholder="127.0.0.1"
                 />
               </ResourceField>
-              <div className="border-[var(--border-defau lt)] rounded-2xl border bg-[var(--surface-muted)] p-4 xl:col-span-2">
+              <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4 xl:col-span-2">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-[var(--foreground-primary)]">
@@ -724,7 +793,8 @@ export function WorkspacePage() {
                     ]
                   ).map((strategy) => (
                     <option key={strategy} value={strategy}>
-                      {strategy}
+                      {strategyLabel[strategy as PortProfileStrategy] ??
+                        strategy}
                     </option>
                   ))}
                 </ResourceSelect>
@@ -942,16 +1012,44 @@ export function WorkspacePage() {
 
           <AppCard
             title="节点选择器"
-            description="从已导入节点中选择工作台要使用的节点，支持关键字过滤。"
+            description="无分页展示最多 1000 个节点；已选节点置顶，顺序即 fallback 优先级。"
           >
-            <div className="space-y-4">
-              <ResourceField label="搜索节点">
-                <ResourceInput
-                  value={nodeSearch}
-                  onChange={(event) => setNodeSearch(event.target.value)}
-                  placeholder="输入节点名称、类型或地址"
-                />
-              </ResourceField>
+            <div className="space-y-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end">
+                <ResourceField label="搜索节点" className="min-w-0 flex-1">
+                  <ResourceInput
+                    value={nodeSearch}
+                    onChange={(event) => setNodeSearch(event.target.value)}
+                    placeholder="名称、协议或出口地址"
+                  />
+                </ResourceField>
+                <div className="flex flex-wrap gap-2">
+                  <SecondaryButton
+                    type="button"
+                    onClick={selectVisibleAvailableNodes}
+                    disabled={displayedNodeOptions.length === 0}
+                  >
+                    选择当前可用
+                  </SecondaryButton>
+                  <SecondaryButton
+                    type="button"
+                    onClick={() =>
+                      setPayload((current) => ({
+                        ...current,
+                        node_ids: [],
+                      }))
+                    }
+                    disabled={payload.node_ids.length === 0}
+                  >
+                    清空选择
+                  </SecondaryButton>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4 text-xs text-[var(--foreground-secondary)]">
+                <span>当前结果 {displayedNodeOptions.length}</span>
+                <span>已选 {payload.node_ids.length}</span>
+                <span>首个可用节点优先承载连接</span>
+              </div>
               {nodeOptionsQuery.isLoading ? <LoadingState /> : null}
               {nodeOptionsQuery.isError ? (
                 <ErrorState
@@ -960,35 +1058,151 @@ export function WorkspacePage() {
                 />
               ) : null}
               {!nodeOptionsQuery.isLoading && !nodeOptionsQuery.isError ? (
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {nodeOptions.map((node) => (
-                    <label
-                      key={node.id}
-                      className="flex gap-3 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedNodeSet.has(node.id)}
-                        onChange={(event) =>
-                          handleToggleNode(node.id, event.target.checked)
-                        }
-                        className="mt-1 h-4 w-4 rounded border-[var(--border-default)] accent-[var(--brand-primary)]"
+                <div className="max-h-[460px] overflow-auto rounded-lg border border-[var(--border-default)]">
+                  <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+                    <thead className="sticky top-0 z-10 bg-[var(--surface-muted)] text-[var(--foreground-secondary)]">
+                      <tr>
+                        <th className="w-10 px-3 py-2 font-medium">选</th>
+                        <th className="w-16 px-2 py-2 font-medium">优先级</th>
+                        <th className="w-24 px-2 py-2 font-medium">状态</th>
+                        <th className="min-w-56 px-2 py-2 font-medium">节点</th>
+                        <th className="min-w-52 px-2 py-2 font-medium">出口</th>
+                        <th className="min-w-44 px-2 py-2 font-medium">
+                          来源 / 标签
+                        </th>
+                        <th className="w-24 px-2 py-2 font-medium">延迟</th>
+                        <th className="w-20 px-3 py-2 text-right font-medium">
+                          排序
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedNodeOptions.map((node) => {
+                        const selectedIndex = payload.node_ids.indexOf(node.id);
+                        const status = getNodeStatus(node);
+                        return (
+                          <tr
+                            key={node.id}
+                            className={
+                              selectedIndex >= 0
+                                ? 'border-t border-[var(--border-default)] bg-[var(--accent-soft)]/45'
+                                : 'border-t border-[var(--border-default)] hover:bg-[var(--surface-muted)]/70'
+                            }
+                          >
+                            <td className="px-3 py-2 align-middle">
+                              <input
+                                type="checkbox"
+                                checked={selectedIndex >= 0}
+                                onChange={(event) =>
+                                  handleToggleNode(
+                                    node.id,
+                                    event.target.checked,
+                                  )
+                                }
+                                aria-label={`选择节点 ${node.name}`}
+                                className="h-4 w-4 accent-[var(--brand-primary)]"
+                              />
+                            </td>
+                            <td className="px-2 py-2 text-center font-mono tabular-nums">
+                              {selectedIndex >= 0 ? selectedIndex + 1 : '—'}
+                            </td>
+                            <td className="px-2 py-2">
+                              <StatusBadge
+                                label={status.label}
+                                variant={status.variant}
+                                className="!px-2 !py-0.5"
+                              />
+                            </td>
+                            <td className="px-2 py-2">
+                              <p
+                                className="max-w-64 truncate font-medium text-[var(--foreground-primary)]"
+                                title={node.name}
+                              >
+                                {node.name}
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-[var(--foreground-muted)]">
+                                #{node.id} · {node.type.toUpperCase()}
+                                {node.consecutive_failures > 0
+                                  ? ` · 连续失败 ${node.consecutive_failures}`
+                                  : ''}
+                              </p>
+                            </td>
+                            <td className="px-2 py-2 font-mono text-[11px] text-[var(--foreground-secondary)]">
+                              <span
+                                className="block max-w-60 truncate"
+                                title={`${node.server}:${node.port}`}
+                              >
+                                {node.server}:{node.port}
+                              </span>
+                              {node.last_test_error ? (
+                                <span
+                                  className="mt-0.5 block max-w-60 truncate text-[var(--status-danger-foreground)]"
+                                  title={node.last_test_error}
+                                >
+                                  {node.last_test_error}
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="px-2 py-2 text-[11px] text-[var(--foreground-secondary)]">
+                              <p
+                                className="max-w-48 truncate"
+                                title={node.source_config_name}
+                              >
+                                {node.source_config_name}
+                              </p>
+                              <p
+                                className="mt-0.5 max-w-48 truncate text-[var(--foreground-muted)]"
+                                title={node.tags || '未设置标签'}
+                              >
+                                {node.tags || '未设置标签'}
+                              </p>
+                            </td>
+                            <td className="px-2 py-2 tabular-nums">
+                              {node.last_latency_ms !== undefined
+                                ? `${node.last_latency_ms} ms`
+                                : '—'}
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex justify-end gap-1">
+                                <button
+                                  type="button"
+                                  title="提高优先级"
+                                  aria-label={`提高 ${node.name} 的优先级`}
+                                  onClick={() => handleMoveNode(node.id, -1)}
+                                  disabled={selectedIndex <= 0}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--control-background)] text-sm disabled:opacity-35"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  title="降低优先级"
+                                  aria-label={`降低 ${node.name} 的优先级`}
+                                  onClick={() => handleMoveNode(node.id, 1)}
+                                  disabled={
+                                    selectedIndex < 0 ||
+                                    selectedIndex ===
+                                      payload.node_ids.length - 1
+                                  }
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--control-background)] text-sm disabled:opacity-35"
+                                >
+                                  ↓
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {displayedNodeOptions.length === 0 ? (
+                    <div className="p-4">
+                      <EmptyState
+                        title="没有匹配节点"
+                        description="调整搜索条件，或先导入节点。"
                       />
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-                          {node.name}
-                        </p>
-                        <p className="text-sm text-[var(--foreground-secondary)]">
-                          {node.type.toUpperCase()} · {node.server}:{node.port}
-                        </p>
-                        <p className="text-xs text-[var(--foreground-secondary)]">
-                          来源：{node.source_config_name} · 标签：
-                          {node.tags || '未设置'} · 最近状态：
-                          {node.last_test_status}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

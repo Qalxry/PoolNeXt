@@ -327,12 +327,12 @@ export function DashboardTopbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-[var(--border-default)] bg-[var(--surface-panel)]/88 px-4 py-4 backdrop-blur md:px-8">
+      <header className="sticky top-0 z-20 border-b border-[var(--border-default)] bg-[var(--surface-panel)]/88 px-3 py-2 backdrop-blur md:px-5">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleSidebarToggle}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] text-lg text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--control-background)] text-base text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
             aria-label="切换侧边栏"
           >
             ☰
@@ -343,7 +343,7 @@ export function DashboardTopbar() {
               type="button"
               onClick={handleOpenVersionModal}
               className={[
-                'inline-flex rounded-full border px-3 py-1.5 transition',
+                'inline-flex rounded-lg border px-2.5 py-1.5 text-xs transition',
                 versionButtonClassName,
               ].join(' ')}
             >
@@ -355,7 +355,7 @@ export function DashboardTopbar() {
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen((value) => !value)}
-                className="inline-flex h-11 items-center gap-2 rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] px-3 text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--control-background)] px-2.5 text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
               >
@@ -370,7 +370,7 @@ export function DashboardTopbar() {
               </button>
 
               {isUserMenuOpen ? (
-                <div className="absolute top-[calc(100%+0.5rem)] right-0 w-52 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-panel)] p-2 shadow-[var(--shadow-lg)]">
+                <div className="absolute top-[calc(100%+0.5rem)] right-0 w-52 rounded-lg border border-[var(--border-default)] bg-[var(--surface-panel)] p-2 shadow-[var(--shadow-lg)]">
                   <div className="rounded-xl px-3 py-2">
                     <p className="text-sm font-semibold text-[var(--foreground-primary)]">
                       {user?.display_name || user?.username || '用户'}

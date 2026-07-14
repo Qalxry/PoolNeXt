@@ -129,9 +129,27 @@ func UpdateEditableOption(option model.Option) error {
 		if timeout > 60000 {
 			return fmt.Errorf("NodeTestDefaultTimeoutMS cannot exceed 60000")
 		}
-	case "RuntimeAutoStartEnabled":
+	case "RuntimeAutoStartEnabled", "NodeHealthCheckEnabled":
 		if option.Value != "true" && option.Value != "false" {
-			return fmt.Errorf("RuntimeAutoStartEnabled must be true or false")
+			return fmt.Errorf("%s must be true or false", option.Key)
+		}
+	case "NodeHealthCheckIntervalSeconds":
+		interval, err := strconv.Atoi(strings.TrimSpace(option.Value))
+		if err != nil || interval < 30 {
+			return fmt.Errorf("NodeHealthCheckIntervalSeconds must be at least 30")
+		}
+		if interval > 86400 {
+			return fmt.Errorf("NodeHealthCheckIntervalSeconds cannot exceed 86400")
+		}
+	case "NodeHealthCheckConcurrency":
+		concurrency, err := strconv.Atoi(strings.TrimSpace(option.Value))
+		if err != nil || concurrency < 1 || concurrency > maxNodeTestParallelism {
+			return fmt.Errorf("NodeHealthCheckConcurrency must be between 1 and %d", maxNodeTestParallelism)
+		}
+	case "NodeHealthFailureThreshold":
+		threshold, err := strconv.Atoi(strings.TrimSpace(option.Value))
+		if err != nil || threshold < 1 || threshold > 10 {
+			return fmt.Errorf("NodeHealthFailureThreshold must be between 1 and 10")
 		}
 	case "ClashAllowLAN":
 		if option.Value != "true" && option.Value != "false" {

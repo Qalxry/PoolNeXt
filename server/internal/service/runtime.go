@@ -29,6 +29,11 @@ const (
 	runtimeWorkDirMode           = 0o700
 )
 
+var (
+	errNoRunnableProfiles      = errors.New("当前没有包含可用节点的端口配置，无法启动 Mihomo")
+	errRuntimeRecoveryCanceled = errors.New("节点恢复后的自动启动已被手动停止取消")
+)
+
 type RuntimeLogEntry struct {
 	Seq       int64     `json:"seq"`
 	Stream    string    `json:"stream"`
@@ -63,13 +68,14 @@ type runtimeOptionSnapshot struct {
 }
 
 type runtimeProcessRegistry struct {
-	operationMu sync.Mutex
-	mu          sync.Mutex
-	process     *runtimeProcess
-	generation  uint64
-	logSeq      int64
-	logs        []*RuntimeLogEntry
-	startedAt   time.Time
+	operationMu                   sync.Mutex
+	mu                            sync.Mutex
+	process                       *runtimeProcess
+	generation                    uint64
+	logSeq                        int64
+	logs                          []*RuntimeLogEntry
+	startedAt                     time.Time
+	resumeAfterNodeHealthRecovery bool
 }
 
 type runtimeProcess struct {
@@ -116,16 +122,36 @@ func AutoStartRuntime(ctx context.Context) error {
 
 	status, err := startRuntime(ctx, true, "auto_start")
 	if err != nil {
-		_ = AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelError, fmt.Sprintf("Mihomo 自动启动失败: %v", err))
+		if errors.Is(err, errNoRunnableProfiles) {
+			runtimeRegistry.setResumeAfterNodeHealthRecovery(true)
+		}
+		_ = AppLog.PushEvent(AppLogEventInput{
+			Classification: model.AppLogClassificationSystem,
+			Level:          model.AppLogLevelError,
+			Event:          "mihomo.auto_start_failed",
+			Source:         "mihomo",
+			Message:        "Mihomo 自动启动失败",
+			Details:        map[string]string{"reason": err.Error()},
+		})
 		return err
 	}
-	_ = AppLog.Push(model.AppLogClassificationSystem, model.AppLogLevelInfo, fmt.Sprintf("Mihomo 自动启动完成，监听 %d 个入口。", status.ListenerCount))
+	_ = AppLog.PushEvent(AppLogEventInput{
+		Classification: model.AppLogClassificationSystem,
+		Level:          model.AppLogLevelInfo,
+		Event:          "mihomo.auto_started",
+		Source:         "mihomo",
+		Message:        "Mihomo 自动启动完成",
+		Details:        map[string]string{"listener_count": fmt.Sprint(status.ListenerCount)},
+	})
 	return nil
 }
 
 func startRuntime(ctx context.Context, allowAlreadyRunning bool, action string) (*RuntimeStatus, error) {
 	runtimeRegistry.operationMu.Lock()
 	defer runtimeRegistry.operationMu.Unlock()
+	if action == "node_health_recovery" && !runtimeRegistry.shouldResumeAfterNodeHealthRecovery() {
+		return nil, errRuntimeRecoveryCanceled
+	}
 
 	if _, err := model.EnsureClashSecret(); err != nil {
 		return nil, fmt.Errorf("初始化 Mihomo 控制密钥失败: %w", err)
@@ -217,13 +243,28 @@ func startRuntime(ctx context.Context, allowAlreadyRunning bool, action string) 
 	if err := saveRuntimeInstance(instance); err != nil {
 		return nil, cleanupStartedRuntime(instance, process, fmt.Errorf("保存 Mihomo 运行状态失败: %w", err))
 	}
-	_ = AppLog.Push(model.AppLogClassificationBusiness, model.AppLogLevelInfo, fmt.Sprintf("Mihomo 已启动，监听 %d 个入口。", rendered.ListenerCount))
+	runtimeRegistry.setResumeAfterNodeHealthRecovery(false)
+	_ = AppLog.PushEvent(AppLogEventInput{
+		Classification: model.AppLogClassificationBusiness,
+		Level:          model.AppLogLevelInfo,
+		Event:          "mihomo.started",
+		Source:         "mihomo",
+		Message:        "Mihomo 已启动",
+		Details:        map[string]string{"listener_count": fmt.Sprint(rendered.ListenerCount)},
+	})
 	return GetRuntimeStatus(ctx)
 }
 
 func StopRuntime(ctx context.Context) (*RuntimeStatus, error) {
+	return stopRuntime(ctx, false)
+}
+
+func stopRuntime(ctx context.Context, resumeAfterNodeHealthRecovery bool) (*RuntimeStatus, error) {
 	runtimeRegistry.operationMu.Lock()
 	defer runtimeRegistry.operationMu.Unlock()
+	if !resumeAfterNodeHealthRecovery {
+		runtimeRegistry.setResumeAfterNodeHealthRecovery(false)
+	}
 
 	options := snapshotRuntimeOptions()
 	instance, err := ensureKernelInstanceFor(options)
@@ -270,6 +311,9 @@ func StopRuntime(ctx context.Context) (*RuntimeStatus, error) {
 				}
 				return nil, stopErr
 			}
+			if resumeAfterNodeHealthRecovery {
+				runtimeRegistry.setResumeAfterNodeHealthRecovery(true)
+			}
 		}
 	}
 
@@ -289,7 +333,13 @@ func StopRuntime(ctx context.Context) (*RuntimeStatus, error) {
 		runtimeRegistry.detachProcess(process)
 	}
 
-	_ = AppLog.Push(model.AppLogClassificationBusiness, model.AppLogLevelInfo, "Mihomo 已停止。")
+	_ = AppLog.PushEvent(AppLogEventInput{
+		Classification: model.AppLogClassificationBusiness,
+		Level:          model.AppLogLevelInfo,
+		Event:          "mihomo.stopped",
+		Source:         "mihomo",
+		Message:        "Mihomo 已停止",
+	})
 	return GetRuntimeStatus(ctx)
 }
 
@@ -378,7 +428,14 @@ func ReloadRuntime(ctx context.Context) (*RuntimeStatus, error) {
 	if err := saveRuntimeInstance(instance); err != nil {
 		return nil, fmt.Errorf("Mihomo 已完成热重载但保存最终状态失败，进程仍由 PoolNeXt 监管: %w", err)
 	}
-	_ = AppLog.Push(model.AppLogClassificationBusiness, model.AppLogLevelInfo, fmt.Sprintf("Mihomo 已热重载，启用 %d 个入口。", rendered.ListenerCount))
+	_ = AppLog.PushEvent(AppLogEventInput{
+		Classification: model.AppLogClassificationBusiness,
+		Level:          model.AppLogLevelInfo,
+		Event:          "mihomo.reloaded",
+		Source:         "mihomo",
+		Message:        "Mihomo 已热重载",
+		Details:        map[string]string{"listener_count": fmt.Sprint(rendered.ListenerCount)},
+	})
 	return GetRuntimeStatus(ctx)
 }
 
@@ -474,11 +531,20 @@ func buildFinalRuntimeConfig(options runtimeOptionSnapshot, persistSnapshots boo
 	enabled := make([]*model.PortProfileWithNodes, 0, len(profiles))
 	for _, profile := range profiles {
 		if profile.Profile.IncludeInRuntime {
-			enabled = append(enabled, profile)
+			runtimeProfile := *profile
+			runtimeProfile.Nodes = selectRuntimeNodes(profile.Nodes)
+			if len(runtimeProfile.Nodes) == 0 {
+				continue
+			}
+			runtimeProfile.NodeIDs = make([]int, 0, len(runtimeProfile.Nodes))
+			for _, node := range runtimeProfile.Nodes {
+				runtimeProfile.NodeIDs = append(runtimeProfile.NodeIDs, node.ID)
+			}
+			enabled = append(enabled, &runtimeProfile)
 		}
 	}
 	if len(enabled) == 0 {
-		return nil, "", "", fmt.Errorf("当前没有加入最终配置的端口配置，无法启动 Mihomo")
+		return nil, "", "", errNoRunnableProfiles
 	}
 	if options.ControllerSecret == "" {
 		return nil, "", "", fmt.Errorf("Mihomo 控制密钥为空")
@@ -503,6 +569,20 @@ func buildFinalRuntimeConfig(options runtimeOptionSnapshot, persistSnapshots boo
 		}
 	}
 	return rendered, workDir, configPath, nil
+}
+
+func selectRuntimeNodes(nodes []*model.ProxyNode) []*model.ProxyNode {
+	available := make([]*model.ProxyNode, 0, len(nodes))
+	for _, node := range nodes {
+		if node == nil || !node.Enabled {
+			continue
+		}
+		if node.QuarantinedAt != nil {
+			continue
+		}
+		available = append(available, node)
+	}
+	return available
 }
 
 func snapshotRuntimeOptions() runtimeOptionSnapshot {
@@ -768,6 +848,18 @@ func (registry *runtimeProcessRegistry) activeProcess() *runtimeProcess {
 	default:
 		return process
 	}
+}
+
+func (registry *runtimeProcessRegistry) setResumeAfterNodeHealthRecovery(enabled bool) {
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.resumeAfterNodeHealthRecovery = enabled
+}
+
+func (registry *runtimeProcessRegistry) shouldResumeAfterNodeHealthRecovery() bool {
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	return registry.resumeAfterNodeHealthRecovery
 }
 
 func (registry *runtimeProcessRegistry) detachProcess(process *runtimeProcess) bool {

@@ -63,6 +63,10 @@ func InitOptionMap() {
 	common.OptionMap["MihomoBinarySource"] = common.MihomoBinarySource
 	common.OptionMap["NodeTestDefaultURL"] = common.NodeTestDefaultURL
 	common.OptionMap["NodeTestDefaultTimeoutMS"] = strconv.Itoa(common.NodeTestDefaultTimeoutMS)
+	common.OptionMap["NodeHealthCheckEnabled"] = strconv.FormatBool(common.NodeHealthCheckEnabled)
+	common.OptionMap["NodeHealthCheckIntervalSeconds"] = strconv.Itoa(common.NodeHealthCheckIntervalSeconds)
+	common.OptionMap["NodeHealthCheckConcurrency"] = strconv.Itoa(common.NodeHealthCheckConcurrency)
+	common.OptionMap["NodeHealthFailureThreshold"] = strconv.Itoa(common.NodeHealthFailureThreshold)
 	common.OptionMap["RuntimeAutoStartEnabled"] = strconv.FormatBool(common.RuntimeAutoStartEnabled)
 	common.OptionMap["ClashAllowLAN"] = strconv.FormatBool(common.ClashAllowLAN)
 	common.OptionMap["ClashExternalController"] = common.ClashExternalController
@@ -171,6 +175,8 @@ func updateOptionMapLocked(key string, value string) {
 			common.RegisterEnabled = boolValue
 		case "RuntimeAutoStartEnabled":
 			common.RuntimeAutoStartEnabled = boolValue
+		case "NodeHealthCheckEnabled":
+			common.NodeHealthCheckEnabled = boolValue
 		}
 	}
 	switch key {
@@ -202,6 +208,18 @@ func updateOptionMapLocked(key string, value string) {
 	case "NodeTestDefaultTimeoutMS":
 		if v, err := strconv.Atoi(value); err == nil && v > 0 {
 			common.NodeTestDefaultTimeoutMS = v
+		}
+	case "NodeHealthCheckIntervalSeconds":
+		if v, err := strconv.Atoi(value); err == nil && v > 0 {
+			common.NodeHealthCheckIntervalSeconds = v
+		}
+	case "NodeHealthCheckConcurrency":
+		if v, err := strconv.Atoi(value); err == nil && v > 0 {
+			common.NodeHealthCheckConcurrency = v
+		}
+	case "NodeHealthFailureThreshold":
+		if v, err := strconv.Atoi(value); err == nil && v > 0 {
+			common.NodeHealthFailureThreshold = v
 		}
 	case "ClashAllowLAN":
 		common.ClashAllowLAN = value == "true"

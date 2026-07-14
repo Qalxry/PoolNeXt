@@ -12,7 +12,10 @@ const baseItem: AppLogItem = {
   id: 1,
   classification: 'system',
   level: 'info',
+  event: 'server_started',
+  source: 'backend',
   message: 'Server started',
+  details: { version: '1.0.0' },
   created_at: '2026-03-21T08:30:45.123Z',
 };
 
@@ -34,7 +37,9 @@ describe('log display utils', () => {
         classification: 'legacy',
         level: 'fatal',
       }),
-    ).toContain('未知分类(legacy) | UNKNOWN(FATAL) | Server started');
+    ).toContain(
+      '未知分类(legacy) | UNKNOWN(FATAL) | 后端 | server_started | Server started | version=1.0.0',
+    );
   });
 
   it('matches keyword against raw values and derived labels', () => {

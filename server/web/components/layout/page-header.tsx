@@ -8,23 +8,18 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div className="space-y-3">
-        <p className="text-sm font-medium tracking-[0.24em] text-[var(--brand-primary)] uppercase">
-          PoolNeXt
-        </p>
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-[var(--foreground-primary)]">
-            {title}
-          </h1>
-          {description ? (
-            <p className="max-w-3xl text-sm leading-7 text-[var(--foreground-secondary)]">
-              {description}
-            </p>
-          ) : null}
-        </div>
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0 space-y-1">
+        <h1 className="text-2xl font-semibold text-[var(--foreground-primary)]">
+          {title}
+        </h1>
+        {description ? (
+          <p className="max-w-4xl text-sm leading-5 text-[var(--foreground-secondary)]">
+            {description}
+          </p>
+        ) : null}
       </div>
-      {action ? <div className="flex flex-wrap gap-3">{action}</div> : null}
+      {action ? <div className="flex flex-wrap gap-2">{action}</div> : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { InlineMessage } from '@/components/feedback/inline-message';
 import { LoadingState } from '@/components/feedback/loading-state';
 import { PageHeader } from '@/components/layout/page-header';
 import { AppCard } from '@/components/ui/app-card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { getKernelCapability } from '@/features/capability/api/capability';
 import {
   getRuntimeLogs,
@@ -50,6 +51,21 @@ function mergeLogs(existing: RuntimeLogItem[], incoming: RuntimeLogItem[]) {
     }
   }
   return result.slice(-300);
+}
+
+function runtimeLogLevelMeta(level: string) {
+  switch (level.toLowerCase()) {
+    case 'error':
+    case 'fatal':
+      return { label: level.toUpperCase(), variant: 'danger' as const };
+    case 'warn':
+    case 'warning':
+      return { label: 'WARN', variant: 'warning' as const };
+    case 'debug':
+      return { label: 'DEBUG', variant: 'info' as const };
+    default:
+      return { label: 'INFO', variant: 'success' as const };
+  }
 }
 
 export function RuntimePage() {
@@ -154,7 +170,7 @@ export function RuntimePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="内核"
         description="聚合工作台端口配置后生成最终 Mihomo 配置，并在这里执行启动、停止、热重载和日志查看。"
@@ -315,25 +331,42 @@ export function RuntimePage() {
             description="请先在工作台启用至少一个端口配置。"
           />
         ) : (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {listenerSummary.map((listener) => (
-              <div
-                key={listener.name}
-                className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4"
-              >
-                <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-                  {listener.name}
-                </p>
-                <div className="mt-2 space-y-1 text-sm text-[var(--foreground-secondary)]">
-                  <p>协议：{listener.type}</p>
-                  <p>
-                    监听：{listener.listen}:{listener.port}
-                  </p>
-                  <p>工作台：{listener.profile_name}</p>
-                  <p>策略组：{listener.proxy_group_name}</p>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
+            <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+              <thead className="bg-[var(--surface-muted)] text-[var(--foreground-secondary)]">
+                <tr>
+                  <th className="px-3 py-2 font-medium">入口</th>
+                  <th className="w-24 px-2 py-2 font-medium">协议</th>
+                  <th className="min-w-48 px-2 py-2 font-medium">监听地址</th>
+                  <th className="min-w-48 px-2 py-2 font-medium">工作台</th>
+                  <th className="min-w-48 px-3 py-2 font-medium">策略组</th>
+                </tr>
+              </thead>
+              <tbody>
+                {listenerSummary.map((listener) => (
+                  <tr
+                    key={listener.name}
+                    className="border-t border-[var(--border-default)] hover:bg-[var(--surface-muted)]/70"
+                  >
+                    <td className="px-3 py-2 font-medium text-[var(--foreground-primary)]">
+                      {listener.name}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--foreground-secondary)] uppercase">
+                      {listener.type}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-[var(--foreground-secondary)]">
+                      {listener.listen}:{listener.port}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--foreground-secondary)]">
+                      {listener.profile_name}
+                    </td>
+                    <td className="px-3 py-2 text-[var(--foreground-secondary)]">
+                      {listener.proxy_group_name}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </AppCard>
@@ -383,20 +416,36 @@ export function RuntimePage() {
             description="启动 Mihomo 后，这里会持续展示 stdout 和 stderr 输出。"
           />
         ) : (
-          <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-elevated)]">
-            <div className="max-h-[520px] overflow-y-auto px-4 py-3">
-              <div className="space-y-2">
-                {logs.map((item) => (
+          <div className="max-h-[520px] overflow-y-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)]">
+            {logs
+              .slice()
+              .reverse()
+              .map((item) => {
+                const level = runtimeLogLevelMeta(item.level);
+                return (
                   <div
                     key={item.seq}
-                    className="rounded-2xl border border-transparent px-3 py-2 font-mono text-xs leading-6 text-[var(--foreground-primary)] hover:border-[var(--border-default)] hover:bg-[var(--surface-card)]"
+                    className="grid gap-2 border-b border-[var(--border-default)] px-3 py-2 last:border-b-0 hover:bg-[var(--surface-card)] lg:grid-cols-[10rem_8rem_minmax(0,1fr)]"
                   >
-                    [{formatDateTime(item.created_at)}] [{item.stream}] [
-                    {item.level}] {item.message}
+                    <time className="font-mono text-[11px] text-[var(--foreground-muted)]">
+                      {formatDateTime(item.created_at)}
+                    </time>
+                    <div className="flex items-center gap-1.5">
+                      <StatusBadge
+                        label={level.label}
+                        variant={level.variant}
+                        className="!px-2 !py-0.5"
+                      />
+                      <span className="text-[10px] text-[var(--foreground-muted)] uppercase">
+                        {item.stream}
+                      </span>
+                    </div>
+                    <p className="min-w-0 font-mono text-xs leading-5 break-words text-[var(--foreground-primary)]">
+                      {item.message}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
+                );
+              })}
           </div>
         )}
       </AppCard>

@@ -70,6 +70,10 @@ const defaultSystemFields = {
   ClashSecret: '',
   NodeTestDefaultURL: 'https://cp.cloudflare.com/generate_204',
   NodeTestDefaultTimeoutMS: '8000',
+  NodeHealthCheckEnabled: true,
+  NodeHealthCheckIntervalSeconds: '300',
+  NodeHealthCheckConcurrency: '2',
+  NodeHealthFailureThreshold: '2',
   GeoIPProvider: 'disabled',
   PasswordLoginEnabled: true,
   PasswordRegisterEnabled: true,
@@ -304,6 +308,11 @@ export function SettingsPage() {
         optionMap.NodeTestDefaultURL ??
         'https://cp.cloudflare.com/generate_204',
       NodeTestDefaultTimeoutMS: optionMap.NodeTestDefaultTimeoutMS ?? '8000',
+      NodeHealthCheckEnabled: toBoolean(optionMap.NodeHealthCheckEnabled, true),
+      NodeHealthCheckIntervalSeconds:
+        optionMap.NodeHealthCheckIntervalSeconds ?? '300',
+      NodeHealthCheckConcurrency: optionMap.NodeHealthCheckConcurrency ?? '2',
+      NodeHealthFailureThreshold: optionMap.NodeHealthFailureThreshold ?? '2',
       GeoIPProvider: optionMap.GeoIPProvider ?? 'disabled',
       PasswordLoginEnabled: toBoolean(optionMap.PasswordLoginEnabled, true),
       PasswordRegisterEnabled: toBoolean(
@@ -643,6 +652,39 @@ export function SettingsPage() {
       if (timeout > 60000) {
         throw new Error('默认测速超时不能超过 60000 毫秒。');
       }
+      const healthInterval = Number.parseInt(
+        systemFields.NodeHealthCheckIntervalSeconds,
+        10,
+      );
+      if (
+        Number.isNaN(healthInterval) ||
+        healthInterval < 30 ||
+        healthInterval > 86400
+      ) {
+        throw new Error('自动探测间隔必须在 30 到 86400 秒之间。');
+      }
+      const healthConcurrency = Number.parseInt(
+        systemFields.NodeHealthCheckConcurrency,
+        10,
+      );
+      if (
+        Number.isNaN(healthConcurrency) ||
+        healthConcurrency < 1 ||
+        healthConcurrency > 4
+      ) {
+        throw new Error('自动探测并发必须在 1 到 4 之间。');
+      }
+      const failureThreshold = Number.parseInt(
+        systemFields.NodeHealthFailureThreshold,
+        10,
+      );
+      if (
+        Number.isNaN(failureThreshold) ||
+        failureThreshold < 1 ||
+        failureThreshold > 10
+      ) {
+        throw new Error('连续失败阈值必须在 1 到 10 之间。');
+      }
       if (!systemFields.NodeTestDefaultURL.trim()) {
         throw new Error('默认测速 URL 不能为空。');
       }
@@ -674,6 +716,13 @@ export function SettingsPage() {
             ['ClashMode', systemFields.ClashMode.trim()],
             ['NodeTestDefaultURL', systemFields.NodeTestDefaultURL.trim()],
             ['NodeTestDefaultTimeoutMS', String(timeout)],
+            [
+              'NodeHealthCheckEnabled',
+              String(systemFields.NodeHealthCheckEnabled),
+            ],
+            ['NodeHealthCheckIntervalSeconds', String(healthInterval)],
+            ['NodeHealthCheckConcurrency', String(healthConcurrency)],
+            ['NodeHealthFailureThreshold', String(failureThreshold)],
           ],
           [['ClashSecret', systemFields.ClashSecret]],
         ),
@@ -1311,10 +1360,10 @@ export function SettingsPage() {
           </AppCard>
 
           <AppCard
-            title="默认测速参数"
-            description="配置导入和节点池的测速操作都会统一使用这里的默认 URL 与超时。"
+            title="节点探测与失效隔离"
+            description="手动检测与后台巡检共用同一套探测参数。节点连续失败达到阈值后会移出运行配置，后续探测成功会自动恢复。"
           >
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.8fr)_minmax(0,220px)]">
+            <div className="grid gap-5 xl:grid-cols-2">
               <ResourceField
                 label="默认测速 URL"
                 hint="节点测试会通过代理访问该地址，建议使用返回体小、响应稳定的探测地址。"
@@ -1347,6 +1396,61 @@ export function SettingsPage() {
                   placeholder="8000"
                 />
               </ResourceField>
+              <ToggleField
+                label="自动巡检节点"
+                description="按设定间隔探测所有启用节点；全局并发有硬上限，不会无限创建 Mihomo 测试进程。"
+                checked={systemFields.NodeHealthCheckEnabled}
+                onChange={(checked) =>
+                  setSystemFields((previous) => ({
+                    ...previous,
+                    NodeHealthCheckEnabled: checked,
+                  }))
+                }
+              />
+              <div className="grid gap-4 sm:grid-cols-3">
+                <ResourceField label="巡检间隔（秒）" hint="30–86400">
+                  <ResourceInput
+                    type="number"
+                    min={30}
+                    max={86400}
+                    value={systemFields.NodeHealthCheckIntervalSeconds}
+                    onChange={(event) =>
+                      setSystemFields((previous) => ({
+                        ...previous,
+                        NodeHealthCheckIntervalSeconds: event.target.value,
+                      }))
+                    }
+                  />
+                </ResourceField>
+                <ResourceField label="巡检并发" hint="1–4">
+                  <ResourceInput
+                    type="number"
+                    min={1}
+                    max={4}
+                    value={systemFields.NodeHealthCheckConcurrency}
+                    onChange={(event) =>
+                      setSystemFields((previous) => ({
+                        ...previous,
+                        NodeHealthCheckConcurrency: event.target.value,
+                      }))
+                    }
+                  />
+                </ResourceField>
+                <ResourceField label="失败隔离阈值" hint="1–10 次">
+                  <ResourceInput
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={systemFields.NodeHealthFailureThreshold}
+                    onChange={(event) =>
+                      setSystemFields((previous) => ({
+                        ...previous,
+                        NodeHealthFailureThreshold: event.target.value,
+                      }))
+                    }
+                  />
+                </ResourceField>
+              </div>
             </div>
           </AppCard>
         </div>
