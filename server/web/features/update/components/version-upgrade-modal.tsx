@@ -137,8 +137,8 @@ export function VersionUpgradeModal({
       description="默认检查正式版更新；你也可以手动检查 preview 发布并选择升级，或上传 Server 二进制确认升级。升级开始后服务会短暂重启。"
       size="lg"
     >
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+      <div className="space-y-3">
+        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-2">
           <AppCard title="服务端版本">
             <div className="flex flex-wrap items-center gap-3">
               <p className="text-sm font-medium text-[var(--foreground-primary)]">
@@ -152,7 +152,7 @@ export function VersionUpgradeModal({
           </AppCard>
 
           <AppCard title="最新版本">
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               <div className="flex flex-wrap items-center gap-3">
                 <p className="text-sm font-medium text-[var(--foreground-primary)]">
                   {release?.tag_name || '未检查'}
@@ -205,7 +205,7 @@ export function VersionUpgradeModal({
                 : '未提供发布时间'
             }
           >
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               <div className="flex flex-wrap items-center gap-3">
                 <StatusBadge
                   label={release.has_update ? '发现新版本' : '已经是最新版本'}
@@ -296,21 +296,27 @@ export function VersionUpgradeModal({
                     }
                   />
                 </div>
-                <div className="max-h-72 overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[#0f172a] px-4 py-3">
+                <div className="max-h-72 overflow-y-auto rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)] px-3 py-2">
                   {upgradeLogs.map((log, index) => (
                     <pre
                       key={`${log.created_at}-${index}`}
-                      className="overflow-x-auto border-b border-white/8 py-2 font-mono text-[12px] leading-6 text-slate-200 last:border-b-0"
+                      className="overflow-x-auto border-b border-[var(--border-default)] py-1.5 font-mono text-[10px] leading-4 text-[var(--foreground-primary)] last:border-b-0"
                     >
-                      <span className="text-slate-400">
+                      <span className="text-[var(--foreground-muted)]">
                         {formatLogTimestamp(log.created_at)}
                       </span>
-                      <span className="text-slate-500"> | </span>
+                      <span className="text-[var(--foreground-muted)]">
+                        {' '}
+                        |{' '}
+                      </span>
                       <span className="text-cyan-300">
                         {formatLogLevel(log.level)}
                       </span>
-                      <span className="text-slate-500"> | </span>
-                      <span className="break-all whitespace-pre-wrap text-slate-100">
+                      <span className="text-[var(--foreground-muted)]">
+                        {' '}
+                        |{' '}
+                      </span>
+                      <span className="break-all whitespace-pre-wrap text-[var(--foreground-primary)]">
                         {log.message}
                       </span>
                     </pre>
@@ -325,7 +331,7 @@ export function VersionUpgradeModal({
 
         {canUpgrade ? (
           <AppCard title="手动升级">
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               <ResourceField
                 label="服务端二进制"
                 hint="支持上传已编译好的当前平台 Server 可执行文件。"
@@ -400,13 +406,13 @@ export function VersionUpgradeModal({
               ) : null}
 
               {!manualErrorMessage && manualStatusMessage ? (
-                <div className="rounded-2xl border border-[var(--status-warning-border)] bg-[var(--status-warning-soft)] px-4 py-3 text-sm text-[var(--status-warning-foreground)]">
+                <div className="rounded-[var(--radius-control)] border border-[var(--status-warning-border)] bg-[var(--status-warning-soft)] px-4 py-3 text-sm text-[var(--status-warning-foreground)]">
                   {manualStatusMessage}
                 </div>
               ) : null}
 
               {uploadedBinary ? (
-                <div className="space-y-4 rounded-3xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
+                <div className="space-y-2.5 rounded-[var(--radius-panel)] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <StatusBadge
                       label={
@@ -428,7 +434,7 @@ export function VersionUpgradeModal({
                     ) : null}
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-2.5 md:grid-cols-2">
                     <div>
                       <p className="text-xs text-[var(--foreground-secondary)]">
                         文件名

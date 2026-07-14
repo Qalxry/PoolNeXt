@@ -138,11 +138,8 @@ export function RegisterForm() {
 
   return (
     <PublicAuthGuard>
-      <AppCard
-        title="新用户注册"
-        description="兼容现有密码注册链路，后续可继续扩展第三方注册。"
-      >
-        <form className="space-y-4" onSubmit={handleSubmit}>
+      <AppCard title="新用户注册">
+        <form className="space-y-2.5" onSubmit={handleSubmit}>
           <AuthFormField label="用户名" hint="最长 12 位">
             <AuthInput
               placeholder="请输入用户名"

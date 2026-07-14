@@ -51,10 +51,10 @@ export function RankChart({
         axisPointer: {
           type: 'shadow',
         },
-        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        backgroundColor: 'rgba(21, 24, 27, 0.96)',
         borderWidth: 0,
         textStyle: {
-          color: '#e2e8f0',
+          color: '#e7e9ea',
           fontSize: 12,
         },
         formatter: (params: unknown) => {
@@ -66,11 +66,11 @@ export function RankChart({
       xAxis: {
         type: 'value',
         axisLabel: {
-          color: '#94a3b8',
+          color: '#aeb5bb',
         },
         splitLine: {
           lineStyle: {
-            color: 'rgba(148, 163, 184, 0.16)',
+            color: 'rgba(174, 181, 187, 0.14)',
             type: 'dashed',
           },
         },
@@ -81,7 +81,7 @@ export function RankChart({
         axisTick: { show: false },
         axisLine: { show: false },
         axisLabel: {
-          color: '#cbd5e1',
+          color: '#cfd4d7',
           width: 120,
           overflow: 'truncate',
         },
@@ -93,7 +93,7 @@ export function RankChart({
           barWidth: 12,
           showBackground: true,
           backgroundStyle: {
-            color: 'rgba(148, 163, 184, 0.12)',
+            color: 'rgba(174, 181, 187, 0.12)',
             borderRadius: 999,
           },
           itemStyle: {
@@ -103,7 +103,7 @@ export function RankChart({
           label: {
             show: true,
             position: 'right',
-            color: '#e2e8f0',
+            color: '#e7e9ea',
             formatter: (params: unknown) =>
               valueFormatter(getChartValue(params)),
           },
@@ -115,7 +115,7 @@ export function RankChart({
 
   if (items.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-3xl border border-dashed border-[var(--border-default)] bg-[var(--surface-muted)] text-sm text-[var(--foreground-secondary)]">
+      <div className="flex h-[220px] items-center justify-center rounded-[var(--radius-panel)] border border-dashed border-[var(--border-default)] bg-[var(--surface-muted)] text-sm text-[var(--foreground-secondary)]">
         {emptyMessage}
       </div>
     );

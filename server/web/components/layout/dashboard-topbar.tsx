@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronDown, LogOut, Menu, UserRound } from 'lucide-react';
 
 import { useAuth } from '@/components/providers/auth-provider';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -327,23 +328,24 @@ export function DashboardTopbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-20 border-b border-[var(--border-default)] bg-[var(--surface-panel)]/88 px-3 py-2 backdrop-blur md:px-5">
-        <div className="flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-20 h-10 border-b border-[var(--border-default)] bg-[var(--surface-panel)] px-2 md:px-3">
+        <div className="flex h-full items-center justify-between gap-2">
           <button
             type="button"
             onClick={handleSidebarToggle}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--control-background)] text-base text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-control)] text-[var(--foreground-secondary)] transition hover:bg-[var(--control-background-hover)] hover:text-[var(--foreground-primary)]"
             aria-label="切换侧边栏"
+            title="切换侧边栏"
           >
-            ☰
+            <Menu className="h-4 w-4" aria-hidden="true" />
           </button>
 
-          <div className="flex items-center gap-3 text-sm text-[var(--foreground-secondary)]">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--foreground-secondary)]">
             <button
               type="button"
               onClick={handleOpenVersionModal}
               className={[
-                'inline-flex rounded-lg border px-2.5 py-1.5 text-xs transition',
+                'inline-flex h-7 items-center rounded-[var(--radius-control)] border px-2 text-[11px] transition hover:bg-[var(--control-background-hover)]',
                 versionButtonClassName,
               ].join(' ')}
             >
@@ -355,11 +357,11 @@ export function DashboardTopbar() {
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen((value) => !value)}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--control-background)] px-2.5 text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
+                className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-transparent px-1.5 text-[var(--foreground-primary)] transition hover:border-[var(--border-default)] hover:bg-[var(--control-background)]"
                 aria-expanded={isUserMenuOpen}
                 aria-haspopup="menu"
               >
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-[4px] bg-[var(--accent-soft)] text-[10px] font-semibold">
                   {(user?.display_name || user?.username || 'U')
                     .slice(0, 1)
                     .toUpperCase()}
@@ -367,26 +369,37 @@ export function DashboardTopbar() {
                 <span className="hidden sm:inline">
                   {user?.display_name || user?.username || '用户'}
                 </span>
+                <ChevronDown
+                  className="h-3.5 w-3.5 text-[var(--foreground-muted)]"
+                  aria-hidden="true"
+                />
               </button>
 
               {isUserMenuOpen ? (
-                <div className="absolute top-[calc(100%+0.5rem)] right-0 w-52 rounded-lg border border-[var(--border-default)] bg-[var(--surface-panel)] p-2 shadow-[var(--shadow-lg)]">
-                  <div className="rounded-xl px-3 py-2">
-                    <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-                      {user?.display_name || user?.username || '用户'}
-                    </p>
-                    {user?.username ? (
-                      <p className="mt-1 text-xs text-[var(--foreground-secondary)]">
-                        @{user.username}
+                <div className="absolute top-[calc(100%+0.25rem)] right-0 w-48 rounded-[var(--radius-panel)] border border-[var(--border-strong)] bg-[var(--surface-panel)] p-1 shadow-[var(--shadow-lg)]">
+                  <div className="flex items-center gap-2 border-b border-[var(--border-default)] px-2 py-2">
+                    <UserRound
+                      className="h-4 w-4 shrink-0 text-[var(--foreground-muted)]"
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-[var(--foreground-primary)]">
+                        {user?.display_name || user?.username || '用户'}
                       </p>
-                    ) : null}
+                      {user?.username ? (
+                        <p className="truncate text-[10px] text-[var(--foreground-secondary)]">
+                          @{user.username}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => void handleLogout()}
                     disabled={isLoggingOut}
-                    className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm text-[var(--status-danger-foreground)] transition hover:bg-[var(--status-danger-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mt-1 flex h-8 w-full items-center gap-2 rounded-[var(--radius-control)] px-2 text-left text-xs text-[var(--status-danger-foreground)] transition hover:bg-[var(--status-danger-soft)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
+                    <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
                     {isLoggingOut ? '退出中...' : '退出登录'}
                   </button>
                 </div>

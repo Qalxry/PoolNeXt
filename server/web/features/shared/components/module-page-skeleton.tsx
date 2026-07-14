@@ -14,7 +14,7 @@ export function ModulePageSkeleton({
   description,
 }: ModulePageSkeletonProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader title={title} description={description} />
 
       <FeaturePlaceholder
@@ -27,7 +27,7 @@ export function ModulePageSkeleton({
         ]}
       />
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-2.5 xl:grid-cols-3">
         <LoadingState />
         <EmptyState
           title="空态骨架"

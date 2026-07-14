@@ -812,14 +812,14 @@ export function SettingsPage() {
 
     if (activeTab === 'personal') {
       return (
-        <div className="space-y-6">
+        <div className="space-y-3">
           {forcePasswordChange ? (
             <InlineMessage
               tone="danger"
               message="这是首次登录或密码重置会话。请立即设置一个新的、唯一的密码；完成前其他管理功能会保持锁定。"
             />
           ) : null}
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
             <AppCard
               title="个人资料"
               description="可更新用户名、显示名称和密码。留空密码表示保持当前密码不变。"
@@ -833,7 +833,7 @@ export function SettingsPage() {
                 </PrimaryButton>
               }
             >
-              <div className="space-y-5">
+              <div className="space-y-3">
                 <ResourceField label="用户名">
                   <ResourceInput
                     value={profileFields.username}
@@ -891,10 +891,10 @@ export function SettingsPage() {
                 </PrimaryButton>
               }
             >
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                    <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+              <div className="space-y-2.5">
+                <div className="grid gap-2.5 md:grid-cols-2">
+                  <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                    <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                       当前角色
                     </p>
                     <div className="mt-2">
@@ -916,8 +916,8 @@ export function SettingsPage() {
                       />
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                    <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                  <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                    <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                       已绑定邮箱
                     </p>
                     <p className="mt-2 text-sm break-all text-[var(--foreground-primary)]">
@@ -952,8 +952,8 @@ export function SettingsPage() {
             title="账号绑定"
             description="支持绑定 GitHub、微信和邮箱地址，用于统一个人身份入口。"
           >
-            <div className="grid gap-6 xl:grid-cols-3">
-              <div className="space-y-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+            <div className="grid gap-3 xl:grid-cols-3">
+              <div className="space-y-2.5 rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
                 <div className="space-y-1">
                   <p className="text-base font-semibold text-[var(--foreground-primary)]">
                     GitHub 账号
@@ -983,7 +983,7 @@ export function SettingsPage() {
                 </PrimaryButton>
               </div>
 
-              <div className="space-y-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+              <div className="space-y-2.5 rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
                 <div className="space-y-1">
                   <p className="text-base font-semibold text-[var(--foreground-primary)]">
                     微信账号
@@ -1000,7 +1000,7 @@ export function SettingsPage() {
                   <img
                     src={publicStatus.wechat_qrcode}
                     alt="微信绑定二维码"
-                    className="h-40 w-40 rounded-2xl border border-[var(--border-default)] object-cover"
+                    className="h-40 w-40 rounded-[var(--radius-control)] border border-[var(--border-default)] object-cover"
                   />
                 ) : null}
                 <ResourceField
@@ -1026,7 +1026,7 @@ export function SettingsPage() {
                 </PrimaryButton>
               </div>
 
-              <div className="space-y-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
+              <div className="space-y-2.5 rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
                 <div className="space-y-1">
                   <p className="text-base font-semibold text-[var(--foreground-primary)]">
                     邮箱地址
@@ -1036,7 +1036,7 @@ export function SettingsPage() {
                     {profile.email ? `已绑定 ${profile.email}` : '未绑定'}
                   </p>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-2.5">
                   <ResourceField label="邮箱地址">
                     <ResourceInput
                       value={emailAddress}
@@ -1114,7 +1114,7 @@ export function SettingsPage() {
 
     if (activeTab === 'clash') {
       return (
-        <div className="space-y-6">
+        <div className="space-y-3">
           <AppCard
             title="代理内核设置"
             description="当前仅支持 Mihomo，Xray 与 sing-box 入口已预留。完成安装后会自动校验版本并写回配置。"
@@ -1128,8 +1128,8 @@ export function SettingsPage() {
               </PrimaryButton>
             }
           >
-            <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-              <div className="space-y-5">
+            <div className="grid gap-3 xl:grid-cols-[0.9fr_1.1fr]">
+              <div className="space-y-3">
                 <ResourceField
                   label="内核类型"
                   hint="当前版本仅开放 Mihomo，其他内核先保留配置入口。"
@@ -1239,25 +1239,25 @@ export function SettingsPage() {
                 ) : null}
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+              <div className="grid gap-2.5 md:grid-cols-2">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     当前内核
                   </p>
                   <p className="mt-2 text-sm text-[var(--foreground-primary)]">
                     {systemFields.KernelType || 'mihomo'}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     已校验版本
                   </p>
                   <p className="mt-2 text-sm text-[var(--foreground-primary)]">
                     {systemFields.MihomoBinaryVersion || '尚未安装'}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     安装来源
                   </p>
                   <p className="mt-2 text-sm text-[var(--foreground-primary)]">
@@ -1270,8 +1270,8 @@ export function SettingsPage() {
                           : '未设置'}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4 md:col-span-2">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5 md:col-span-2">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     当前路径
                   </p>
                   <p className="mt-2 text-sm break-all text-[var(--foreground-primary)]">
@@ -1286,7 +1286,7 @@ export function SettingsPage() {
             title="Clash 运行参数"
             description="这些设置会参与最终 Mihomo 配置渲染，并在启动与热重载时生效。"
           >
-            <div className="grid gap-5 xl:grid-cols-2">
+            <div className="grid gap-3 xl:grid-cols-2">
               <ResourceField
                 label="external-controller"
                 hint="控制接口监听地址，格式为 host:port。"
@@ -1363,7 +1363,7 @@ export function SettingsPage() {
             title="节点探测与失效隔离"
             description="手动检测与后台巡检共用同一套探测参数。节点连续失败达到阈值后会移出运行配置，后续探测成功会自动恢复。"
           >
-            <div className="grid gap-5 xl:grid-cols-2">
+            <div className="grid gap-3 xl:grid-cols-2">
               <ResourceField
                 label="默认测速 URL"
                 hint="节点测试会通过代理访问该地址，建议使用返回体小、响应稳定的探测地址。"
@@ -1407,7 +1407,7 @@ export function SettingsPage() {
                   }))
                 }
               />
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-2.5 sm:grid-cols-3">
                 <ResourceField label="巡检间隔（秒）" hint="30–86400">
                   <ResourceInput
                     type="number"
@@ -1459,12 +1459,12 @@ export function SettingsPage() {
 
     if (activeTab === 'system') {
       return (
-        <div className="space-y-6">
+        <div className="space-y-3">
           <AppCard
             title="登录与注册开关"
             description="切换后立即生效，无需重启服务。"
           >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
               <ToggleField
                 label="允许密码登录"
                 description="关闭后将无法使用用户名密码登录。"
@@ -1531,7 +1531,7 @@ export function SettingsPage() {
             </div>
           </AppCard>
 
-          <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+          <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
             <AppCard
               title="系统更新"
               description="配置服务端版本检查使用的上游仓库。"
@@ -1557,7 +1557,7 @@ export function SettingsPage() {
                 </PrimaryButton>
               }
             >
-              <div className="space-y-5">
+              <div className="space-y-3">
                 <ResourceField
                   label="上游更新仓库"
                   hint="默认使用 Qalxry/PoolNeXt，也可按 owner/repo 格式改为你自己的发布仓库。"
@@ -1574,33 +1574,33 @@ export function SettingsPage() {
                   />
                 </ResourceField>
               </div>
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+              <div className="mt-5 grid gap-2.5 md:grid-cols-2">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     服务端版本
                   </p>
                   <p className="mt-2 text-sm text-[var(--foreground-primary)]">
                     {publicStatus.version}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     Server 启动时间
                   </p>
                   <p className="mt-2 text-sm text-[var(--foreground-primary)]">
                     {formatDateTime(new Date(publicStatus.start_time * 1000))}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     运行模式
                   </p>
                   <p className="mt-2 text-sm text-[var(--foreground-primary)]">
                     静态导出 + Go Server 托管
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4 md:col-span-2">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5 md:col-span-2">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     版本入口
                   </p>
                   <p className="mt-2 text-sm text-[var(--foreground-primary)]">
@@ -1665,7 +1665,7 @@ export function SettingsPage() {
                   placeholder="https://yourdomain.com"
                 />
               </ResourceField>
-              <div className="mt-5 space-y-5">
+              <div className="mt-5 space-y-3">
                 <ResourceField
                   label="IP 归属方式"
                   hint="disabled 关闭归属解析；mmdb 使用本地数据库；其余选项调用外部 GeoIP 服务。"
@@ -1686,8 +1686,8 @@ export function SettingsPage() {
                     <option value="ipinfo">ipinfo.io</option>
                   </ResourceSelect>
                 </ResourceField>
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5">
-                  <div className="space-y-4">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
+                  <div className="space-y-2.5">
                     <ResourceField
                       label="归属解析测试"
                       hint="测试使用当前表单中选择的归属方式，不要求先保存设置。"
@@ -1720,7 +1720,7 @@ export function SettingsPage() {
                       </div>
                     </ResourceField>
                     {geoIPPreviewResult ? (
-                      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] px-4 py-4 text-sm text-[var(--foreground-secondary)]">
+                      <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--foreground-secondary)]">
                         <p>Provider: {geoIPPreviewResult.provider}</p>
                         <p>IP: {geoIPPreviewResult.ip}</p>
                         <p>
@@ -1772,7 +1772,7 @@ export function SettingsPage() {
                 </PrimaryButton>
               }
             >
-              <div className="grid gap-5 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2">
                 <ResourceField label="SMTP 服务器">
                   <ResourceInput
                     value={systemFields.SMTPServer}
@@ -1892,8 +1892,8 @@ export function SettingsPage() {
                 </PrimaryButton>
               }
             >
-              <div className="space-y-5">
-                <div className="grid gap-5 md:grid-cols-2">
+              <div className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-2">
                   <ResourceField label="GitHub Client ID">
                     <ResourceInput
                       value={systemFields.GitHubClientId}
@@ -2068,15 +2068,15 @@ export function SettingsPage() {
               </PrimaryButton>
             }
           >
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5">
+            <div className="grid gap-2.5 lg:grid-cols-2">
+              <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
                 <p className="text-sm font-semibold text-[var(--foreground-primary)]">
                   全局 API 限流
                 </p>
                 <p className="mt-1 text-sm text-[var(--foreground-muted)]">
                   作用于 `/api` 下的通用请求。
                 </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
                   <ResourceField label="请求次数">
                     <ResourceInput
                       type="number"
@@ -2106,14 +2106,14 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5">
+              <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
                 <p className="text-sm font-semibold text-[var(--foreground-primary)]">
                   全局 Web 限流
                 </p>
                 <p className="mt-1 text-sm text-[var(--foreground-muted)]">
                   作用于页面和静态资源请求，过低会更容易触发 429。
                 </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
                   <ResourceField label="请求次数">
                     <ResourceInput
                       type="number"
@@ -2143,14 +2143,14 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5">
+              <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
                 <p className="text-sm font-semibold text-[var(--foreground-primary)]">
                   上传 / 下载限流
                 </p>
                 <p className="mt-1 text-sm text-[var(--foreground-muted)]">
                   用于文件上传与下载接口，建议保留相对严格的阈值。
                 </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
                   <ResourceField label="上传请求次数">
                     <ResourceInput
                       type="number"
@@ -2206,14 +2206,14 @@ export function SettingsPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5">
+              <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
                 <p className="text-sm font-semibold text-[var(--foreground-primary)]">
                   敏感接口限流
                 </p>
                 <p className="mt-1 text-sm text-[var(--foreground-muted)]">
                   用于登录、注册、验证码、重置密码和 OAuth 等接口。
                 </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
                   <ResourceField label="请求次数">
                     <ResourceInput
                       type="number"
@@ -2249,8 +2249,8 @@ export function SettingsPage() {
     }
 
     return (
-      <div className="space-y-6">
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+      <div className="space-y-3">
+        <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
           <AppCard
             title="公告与品牌信息"
             description="用于控制首页公告、系统名称、默认首页链接和页脚展示。"
@@ -2276,7 +2276,7 @@ export function SettingsPage() {
               </PrimaryButton>
             }
           >
-            <div className="space-y-5">
+            <div className="space-y-3">
               <ResourceField label="系统名称">
                 <ResourceInput
                   value={otherFields.SystemName}
@@ -2348,7 +2348,7 @@ export function SettingsPage() {
               </PrimaryButton>
             }
           >
-            <div className="space-y-5">
+            <div className="space-y-3">
               <ResourceField
                 label="关于内容"
                 hint="支持 Markdown 和 HTML，保存后会同步到公开关于页。"
@@ -2373,30 +2373,28 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader title="设置" />
 
       {feedback ? (
         <InlineMessage tone={feedback.tone} message={feedback.message} />
       ) : null}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex min-h-9 overflow-x-auto border-b border-[var(--border-default)]">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
             className={[
-              'rounded-2xl border px-4 py-3 text-left transition',
+              'h-9 shrink-0 border-b-2 px-3 text-xs font-medium transition',
               activeTab === tab.key
-                ? 'border-[var(--border-strong)] bg-[var(--accent-soft)] text-[var(--foreground-primary)]'
-                : 'border-[var(--border-default)] bg-[var(--surface-muted)] text-[var(--foreground-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--foreground-primary)]',
+                ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                : 'border-transparent text-[var(--foreground-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--foreground-primary)]',
             ].join(' ')}
+            title={tab.description}
           >
-            <p className="text-sm font-semibold">{tab.label}</p>
-            <p className="mt-1 text-xs leading-5 text-inherit/80">
-              {tab.description}
-            </p>
+            {tab.label}
           </button>
         ))}
       </div>

@@ -24,7 +24,7 @@ export function InlineMessage({
   return (
     <div
       className={cn(
-        'rounded-2xl border px-4 py-3 text-sm leading-6',
+        'rounded-[var(--radius-control)] border px-2.5 py-2 text-xs leading-4',
         toneClasses[tone],
         className,
       )}

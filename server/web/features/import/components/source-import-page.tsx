@@ -254,32 +254,24 @@ export function SourceImportPanel({
   };
 
   return (
-    <div className="space-y-6">
-      {!embedded ? (
-        <PageHeader
-          title="配置导入"
-          description="上传 Clash/Mihomo YAML，或填写返回 YAML 的订阅地址；服务端会完成解析、标准化和去重预检，再将确认后的节点导入节点池。"
-        />
-      ) : null}
+    <div className="space-y-3">
+      {!embedded ? <PageHeader title="配置导入" /> : null}
 
       {feedback ? (
         <InlineMessage tone={feedback.tone} message={feedback.message} />
       ) : null}
 
-      <AppCard
-        title="上传并解析"
-        description="当前最小版本支持从 `proxies` 列表读取节点，并按节点指纹做批内去重与库内去重预检。"
-      >
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-3">
+      <AppCard title="上传并解析">
+        <div className="space-y-2.5">
+          <div className="inline-flex rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)] p-0.5">
             <PrimaryButton
               type="button"
               aria-pressed={sourceMode === 'upload'}
               onClick={() => setSourceMode('upload')}
               className={
                 sourceMode === 'upload'
-                  ? undefined
-                  : 'border border-[var(--border-default)] bg-[var(--control-background)] text-[var(--foreground-primary)] hover:bg-[var(--control-background-hover)]'
+                  ? '!h-7'
+                  : '!h-7 bg-transparent text-[var(--foreground-secondary)] hover:bg-[var(--control-background-hover)]'
               }
             >
               上传 YAML
@@ -290,8 +282,8 @@ export function SourceImportPanel({
               onClick={() => setSourceMode('subscription_url')}
               className={
                 sourceMode === 'subscription_url'
-                  ? undefined
-                  : 'border border-[var(--border-default)] bg-[var(--control-background)] text-[var(--foreground-primary)] hover:bg-[var(--control-background-hover)]'
+                  ? '!h-7'
+                  : '!h-7 bg-transparent text-[var(--foreground-secondary)] hover:bg-[var(--control-background-hover)]'
               }
             >
               订阅地址
@@ -306,7 +298,7 @@ export function SourceImportPanel({
                 onChange={(event) =>
                   setSelectedFile(event.target.files?.[0] ?? null)
                 }
-                className="block w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--foreground-primary)]"
+                className="block h-9 w-full rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--control-background)] px-2.5 py-1.5 text-xs text-[var(--foreground-primary)]"
               />
             </ResourceField>
           ) : (
@@ -324,7 +316,7 @@ export function SourceImportPanel({
             </ResourceField>
           )}
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-1.5">
             <PrimaryButton
               type="button"
               onClick={() => {
@@ -363,35 +355,47 @@ export function SourceImportPanel({
 
       {parseResult && summary ? (
         <>
-          <div className="grid gap-4 lg:grid-cols-5">
-            <AppCard title="总节点数" description="含有效节点与解析失败条目。">
-              <p className="text-2xl font-semibold text-[var(--foreground-primary)]">
+          <div className="metric-strip grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+              <span className="text-[10px] text-[var(--foreground-secondary)]">
+                总节点
+              </span>
+              <span className="text-sm font-semibold text-[var(--foreground-primary)] tabular-nums">
                 {summary.total_nodes}
-              </p>
-            </AppCard>
-            <AppCard
-              title="有效节点"
-              description="满足最小字段要求的可识别节点。"
-            >
-              <p className="text-2xl font-semibold text-[var(--foreground-primary)]">
+              </span>
+            </div>
+            <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+              <span className="text-[10px] text-[var(--foreground-secondary)]">
+                有效
+              </span>
+              <span className="text-sm font-semibold text-[var(--foreground-primary)] tabular-nums">
                 {summary.valid_nodes}
-              </p>
-            </AppCard>
-            <AppCard title="错误条目" description="无法标准化的配置项。">
-              <p className="text-2xl font-semibold text-[var(--foreground-primary)]">
+              </span>
+            </div>
+            <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+              <span className="text-[10px] text-[var(--foreground-secondary)]">
+                错误
+              </span>
+              <span className="text-sm font-semibold text-[var(--status-danger-foreground)] tabular-nums">
                 {summary.invalid_nodes}
-              </p>
-            </AppCard>
-            <AppCard title="重复节点" description="批内重复或库内已存在。">
-              <p className="text-2xl font-semibold text-[var(--foreground-primary)]">
+              </span>
+            </div>
+            <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+              <span className="text-[10px] text-[var(--foreground-secondary)]">
+                重复
+              </span>
+              <span className="text-sm font-semibold text-[var(--status-warning-foreground)] tabular-nums">
                 {summary.duplicate_nodes}
-              </p>
-            </AppCard>
-            <AppCard title="可导入" description="确认后会写入节点池的节点数。">
-              <p className="text-2xl font-semibold text-[var(--foreground-primary)]">
+              </span>
+            </div>
+            <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+              <span className="text-[10px] text-[var(--foreground-secondary)]">
+                可导入
+              </span>
+              <span className="text-sm font-semibold text-[var(--status-success-foreground)] tabular-nums">
                 {summary.importable_nodes}
-              </p>
-            </AppCard>
+              </span>
+            </div>
           </div>
 
           <AppCard title="导入确认" description={importSourceDescription}>
@@ -467,7 +471,7 @@ export function SourceImportPanel({
             </div>
           </AppCard>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <AppCard
               title="节点预览"
               description="默认最多展示前 100 个解析结果，支持勾选后批量测速或从本次预览移除。"
@@ -547,7 +551,7 @@ export function SourceImportPanel({
                   parseResult.errors.map((issue, index) => (
                     <div
                       key={`${issue.index}-${index}`}
-                      className="rounded-2xl border border-[var(--status-danger-border)] bg-[var(--status-danger-soft)] p-4 text-sm text-[var(--status-danger-foreground)]"
+                      className="rounded-[var(--radius-control)] border border-[var(--status-danger-border)] bg-[var(--status-danger-soft)] p-3 text-sm text-[var(--status-danger-foreground)]"
                     >
                       <p className="font-medium">
                         条目 #{issue.index + 1}
@@ -573,7 +577,7 @@ export function SourceImportPanel({
                   testResults.map((item, index) => (
                     <div
                       key={`${item.node_name}-${index}`}
-                      className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4"
+                      className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-muted)] p-3"
                     >
                       <p className="text-sm font-semibold text-[var(--foreground-primary)]">
                         {item.node_name}

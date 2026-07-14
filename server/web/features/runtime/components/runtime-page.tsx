@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ExternalLink,
+  Pause,
+  Play,
+  RefreshCw,
+  RotateCw,
+  Square,
+} from 'lucide-react';
 
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -66,6 +74,37 @@ function runtimeLogLevelMeta(level: string) {
     default:
       return { label: 'INFO', variant: 'success' as const };
   }
+}
+
+function RuntimeMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string | number;
+  detail?: string;
+}) {
+  return (
+    <div className="flex min-h-11 items-center justify-between gap-2 px-2.5 py-1.5">
+      <div className="min-w-0">
+        <span className="block text-[10px] text-[var(--foreground-secondary)]">
+          {label}
+        </span>
+        {detail ? (
+          <span
+            className="block max-w-44 truncate text-[9px] text-[var(--foreground-muted)]"
+            title={detail}
+          >
+            {detail}
+          </span>
+        ) : null}
+      </div>
+      <span className="shrink-0 text-sm font-semibold text-[var(--foreground-primary)] tabular-nums">
+        {value}
+      </span>
+    </div>
+  );
 }
 
 export function RuntimePage() {
@@ -170,17 +209,21 @@ export function RuntimePage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <PageHeader
         title="内核"
-        description="聚合工作台端口配置后生成最终 Mihomo 配置，并在这里执行启动、停止、热重载和日志查看。"
         action={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             <SecondaryButton
               type="button"
               onClick={() => setAutoRefresh((value) => !value)}
             >
-              {autoRefresh ? '暂停刷新' : '自动刷新'}
+              {autoRefresh ? (
+                <Pause className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              {autoRefresh ? '暂停' : '刷新'}
             </SecondaryButton>
             <PrimaryButton
               type="button"
@@ -194,6 +237,7 @@ export function RuntimePage() {
                 !capability?.supports_start
               }
             >
+              <Play className="h-3.5 w-3.5" aria-hidden="true" />
               {startMutation.isPending ? '启动中...' : '启动'}
             </PrimaryButton>
             <SecondaryButton
@@ -208,6 +252,7 @@ export function RuntimePage() {
                 !capability?.supports_reload
               }
             >
+              <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
               {reloadMutation.isPending ? '重载中...' : '热重载'}
             </SecondaryButton>
             <DangerButton
@@ -218,6 +263,7 @@ export function RuntimePage() {
               }}
               disabled={stopMutation.isPending || !status.running}
             >
+              <Square className="h-3.5 w-3.5" aria-hidden="true" />
               {stopMutation.isPending ? '停止中...' : '停止'}
             </DangerButton>
             <SecondaryButton
@@ -227,7 +273,8 @@ export function RuntimePage() {
               }
               disabled={!status.running}
             >
-              打开 Clash 控制台
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              Clash 控制台
             </SecondaryButton>
           </div>
         }
@@ -243,103 +290,96 @@ export function RuntimePage() {
         />
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-5">
-        <AppCard title="进程状态" description="当前 Mihomo 进程是否正在运行。">
-          <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-            {status.running ? '运行中' : '已停止'}
-          </p>
-          <p className="mt-2 text-xs text-[var(--foreground-secondary)]">
-            {status.instance.status}
-          </p>
-        </AppCard>
-        <AppCard
-          title="自动启动"
-          description="PoolNeXt 服务启动时是否自动拉起当前代理池。"
-        >
-          <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-            {status.auto_start_enabled ? '已开启' : '已关闭'}
-          </p>
-          <p className="mt-2 text-xs text-[var(--foreground-secondary)]">
-            {status.instance.last_action === 'auto_start'
-              ? status.instance.last_error || '最近自动启动成功'
-              : '可在设置 / Clash 中修改'}
-          </p>
-        </AppCard>
-        <AppCard
-          title="API 健康"
-          description="本地 external-controller 检查结果。"
-        >
-          <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-            {status.api_healthy ? '正常' : '未就绪'}
-          </p>
-          <p className="mt-2 text-xs text-[var(--foreground-secondary)]">
-            {status.api_version || status.instance.controller_address}
-          </p>
-        </AppCard>
-        <AppCard
-          title="端口配置"
-          description="当前参与最终配置聚合的工作台配置数量。"
-        >
-          <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-            {status.profile_count}
-          </p>
-        </AppCard>
-        <AppCard title="监听入口" description="当前最终配置会暴露的监听数量。">
-          <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-            {status.listener_count}
-          </p>
-        </AppCard>
+      <div className="metric-strip grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+        <RuntimeMetric
+          label="进程"
+          value={status.running ? '运行中' : '已停止'}
+          detail={status.instance.status}
+        />
+        <RuntimeMetric
+          label="自动启动"
+          value={status.auto_start_enabled ? '已开启' : '已关闭'}
+          detail={
+            status.instance.last_action === 'auto_start'
+              ? status.instance.last_error || '最近启动成功'
+              : undefined
+          }
+        />
+        <RuntimeMetric
+          label="控制 API"
+          value={status.api_healthy ? '正常' : '未就绪'}
+          detail={status.api_version || status.instance.controller_address}
+        />
+        <RuntimeMetric label="端口配置" value={status.profile_count} />
+        <RuntimeMetric label="监听入口" value={status.listener_count} />
       </div>
 
-      <AppCard
-        title="实例详情"
-        description="展示最近动作、PID、配置文件位置和错误摘要。"
-      >
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-2 text-sm text-[var(--foreground-secondary)]">
-            <p>PID：{status.instance.pid ?? '未运行'}</p>
-            <p>最近动作：{status.instance.last_action || '无'}</p>
-            <p>
-              启动时间：
-              {status.instance.last_started_at
-                ? formatDateTime(status.instance.last_started_at)
-                : '未启动'}
-            </p>
-            <p>
-              重载时间：
-              {status.instance.last_reloaded_at
-                ? formatDateTime(status.instance.last_reloaded_at)
-                : '未重载'}
-            </p>
-          </div>
-          <div className="space-y-2 text-sm text-[var(--foreground-secondary)]">
-            <p>运行目录：{status.instance.work_dir || '未生成'}</p>
-            <p>配置路径：{status.instance.config_path || '未生成'}</p>
-            <p>控制地址：{status.instance.controller_address || '未生成'}</p>
-            <p>最近错误：{status.instance.last_error || '无'}</p>
-          </div>
+      <AppCard title="实例详情">
+        <div className="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-[11px] md:grid-cols-[6rem_minmax(0,1fr)_6rem_minmax(0,1fr)]">
+          <span className="text-[var(--foreground-muted)]">PID</span>
+          <span className="text-[var(--foreground-primary)] tabular-nums">
+            {status.instance.pid ?? '未运行'}
+          </span>
+          <span className="text-[var(--foreground-muted)]">最近动作</span>
+          <span className="text-[var(--foreground-primary)]">
+            {status.instance.last_action || '无'}
+          </span>
+          <span className="text-[var(--foreground-muted)]">启动时间</span>
+          <span className="text-[var(--foreground-secondary)] tabular-nums">
+            {status.instance.last_started_at
+              ? formatDateTime(status.instance.last_started_at)
+              : '未启动'}
+          </span>
+          <span className="text-[var(--foreground-muted)]">重载时间</span>
+          <span className="text-[var(--foreground-secondary)] tabular-nums">
+            {status.instance.last_reloaded_at
+              ? formatDateTime(status.instance.last_reloaded_at)
+              : '未重载'}
+          </span>
+          <span className="text-[var(--foreground-muted)]">运行目录</span>
+          <span
+            className="truncate font-mono text-[10px] text-[var(--foreground-secondary)]"
+            title={status.instance.work_dir}
+          >
+            {status.instance.work_dir || '未生成'}
+          </span>
+          <span className="text-[var(--foreground-muted)]">配置路径</span>
+          <span
+            className="truncate font-mono text-[10px] text-[var(--foreground-secondary)]"
+            title={status.instance.config_path}
+          >
+            {status.instance.config_path || '未生成'}
+          </span>
+          <span className="text-[var(--foreground-muted)]">控制地址</span>
+          <span className="font-mono text-[10px] text-[var(--foreground-secondary)]">
+            {status.instance.controller_address || '未生成'}
+          </span>
+          <span className="text-[var(--foreground-muted)]">最近错误</span>
+          <span
+            className="truncate text-[var(--status-danger-foreground)]"
+            title={status.instance.last_error}
+          >
+            {status.instance.last_error || '无'}
+          </span>
         </div>
       </AppCard>
 
-      <AppCard
-        title="监听列表"
-        description="每个监听入口对应一个工作台端口配置和策略组。"
-      >
+      <AppCard title="监听列表">
         {listenerSummary.length === 0 ? (
           <EmptyState
             title="暂无监听入口"
             description="请先在工作台启用至少一个端口配置。"
           />
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
-            <table className="w-full min-w-[720px] border-collapse text-left text-xs">
-              <thead className="bg-[var(--surface-muted)] text-[var(--foreground-secondary)]">
+          <div className="overflow-x-auto rounded-[var(--radius-control)] border border-[var(--border-default)]">
+            <table className="w-full min-w-[720px] border-collapse text-left text-[11px]">
+              <thead className="bg-[var(--surface-muted)] text-[10px] text-[var(--foreground-secondary)]">
                 <tr>
-                  <th className="px-3 py-2 font-medium">入口</th>
-                  <th className="w-24 px-2 py-2 font-medium">协议</th>
-                  <th className="min-w-48 px-2 py-2 font-medium">监听地址</th>
-                  <th className="min-w-48 px-2 py-2 font-medium">工作台</th>
-                  <th className="min-w-48 px-3 py-2 font-medium">策略组</th>
+                  <th className="px-2 py-1.5 font-medium">入口</th>
+                  <th className="w-20 px-2 py-1.5 font-medium">协议</th>
+                  <th className="min-w-48 px-2 py-1.5 font-medium">监听地址</th>
+                  <th className="min-w-48 px-2 py-1.5 font-medium">工作台</th>
+                  <th className="min-w-48 px-2 py-1.5 font-medium">策略组</th>
                 </tr>
               </thead>
               <tbody>
@@ -348,19 +388,19 @@ export function RuntimePage() {
                     key={listener.name}
                     className="border-t border-[var(--border-default)] hover:bg-[var(--surface-muted)]/70"
                   >
-                    <td className="px-3 py-2 font-medium text-[var(--foreground-primary)]">
+                    <td className="h-8 px-2 py-0 font-medium text-[var(--foreground-primary)]">
                       {listener.name}
                     </td>
-                    <td className="px-2 py-2 text-[var(--foreground-secondary)] uppercase">
+                    <td className="h-8 px-2 py-0 text-[var(--foreground-secondary)] uppercase">
                       {listener.type}
                     </td>
-                    <td className="px-2 py-2 font-mono text-[var(--foreground-secondary)]">
+                    <td className="h-8 px-2 py-0 font-mono text-[10px] text-[var(--foreground-secondary)]">
                       {listener.listen}:{listener.port}
                     </td>
-                    <td className="px-2 py-2 text-[var(--foreground-secondary)]">
+                    <td className="h-8 px-2 py-0 text-[var(--foreground-secondary)]">
                       {listener.profile_name}
                     </td>
-                    <td className="px-3 py-2 text-[var(--foreground-secondary)]">
+                    <td className="h-8 px-2 py-0 text-[var(--foreground-secondary)]">
                       {listener.proxy_group_name}
                     </td>
                   </tr>
@@ -371,26 +411,23 @@ export function RuntimePage() {
         )}
       </AppCard>
 
-      <AppCard
-        title="最终配置摘要"
-        description="仅展示非敏感元数据，控制密钥和节点凭据不会在界面中展开。"
-      >
-        <div className="grid gap-4 text-sm text-[var(--foreground-secondary)] md:grid-cols-3">
+      <AppCard title="最终配置摘要">
+        <div className="grid gap-2 text-[11px] text-[var(--foreground-secondary)] md:grid-cols-3">
           <div>
             <p className="text-xs text-[var(--foreground-muted)]">活动配置</p>
-            <p className="mt-1 font-medium text-[var(--foreground-primary)]">
+            <p className="font-medium text-[var(--foreground-primary)]">
               {status.instance.active_config_checksum ? '已加载' : '未加载'}
             </p>
           </div>
           <div>
             <p className="text-xs text-[var(--foreground-muted)]">参与工作台</p>
-            <p className="mt-1 font-medium text-[var(--foreground-primary)]">
+            <p className="font-medium text-[var(--foreground-primary)]">
               {status.profile_count}
             </p>
           </div>
           <div>
             <p className="text-xs text-[var(--foreground-muted)]">监听入口</p>
-            <p className="mt-1 font-medium text-[var(--foreground-primary)]">
+            <p className="font-medium text-[var(--foreground-primary)]">
               {status.listener_count}
             </p>
           </div>
@@ -398,7 +435,7 @@ export function RuntimePage() {
             <p className="text-xs text-[var(--foreground-muted)]">
               活动配置校验和
             </p>
-            <p className="mt-1 font-mono text-xs break-all text-[var(--foreground-primary)]">
+            <p className="font-mono text-[10px] break-all text-[var(--foreground-primary)]">
               {status.instance.active_config_checksum || '暂无'}
             </p>
           </div>
@@ -407,7 +444,7 @@ export function RuntimePage() {
 
       <AppCard
         title="运行日志"
-        description={`当前缓存 ${logs.length} 条运行日志${lastSeq > 0 ? `，最新序号 ${lastSeq}` : ''}`}
+        description={`${logs.length} 条${lastSeq > 0 ? ` · 最新 #${lastSeq}` : ''}`}
       >
         {logsQuery.isLoading ? <LoadingState /> : null}
         {logs.length === 0 ? (
@@ -416,7 +453,7 @@ export function RuntimePage() {
             description="启动 Mihomo 后，这里会持续展示 stdout 和 stderr 输出。"
           />
         ) : (
-          <div className="max-h-[520px] overflow-y-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)]">
+          <div className="max-h-[420px] overflow-auto rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)]">
             {logs
               .slice()
               .reverse()
@@ -425,22 +462,25 @@ export function RuntimePage() {
                 return (
                   <div
                     key={item.seq}
-                    className="grid gap-2 border-b border-[var(--border-default)] px-3 py-2 last:border-b-0 hover:bg-[var(--surface-card)] lg:grid-cols-[10rem_8rem_minmax(0,1fr)]"
+                    className="grid h-8 min-w-[760px] grid-cols-[10rem_7rem_minmax(0,1fr)] items-center gap-2 border-b border-[var(--border-default)] px-2 last:border-b-0 hover:bg-[var(--surface-muted)]"
                   >
-                    <time className="font-mono text-[11px] text-[var(--foreground-muted)]">
+                    <time className="truncate font-mono text-[10px] text-[var(--foreground-muted)]">
                       {formatDateTime(item.created_at)}
                     </time>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <StatusBadge
                         label={level.label}
                         variant={level.variant}
-                        className="!px-2 !py-0.5"
+                        className="w-fit"
                       />
                       <span className="text-[10px] text-[var(--foreground-muted)] uppercase">
                         {item.stream}
                       </span>
                     </div>
-                    <p className="min-w-0 font-mono text-xs leading-5 break-words text-[var(--foreground-primary)]">
+                    <p
+                      className="min-w-0 truncate font-mono text-[10px] text-[var(--foreground-primary)]"
+                      title={item.message}
+                    >
                       {item.message}
                     </p>
                   </div>

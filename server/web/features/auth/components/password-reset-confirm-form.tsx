@@ -52,7 +52,7 @@ export function PasswordResetConfirmForm() {
       title="密码重置确认"
       description="确认后，系统会生成新的随机密码。"
     >
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         <AuthFormField label="邮箱地址">
           <AuthInput value={email} readOnly />
         </AuthFormField>

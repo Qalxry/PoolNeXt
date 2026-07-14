@@ -16,13 +16,13 @@ export function AuthFormField({
   children: ReactNode;
 }) {
   return (
-    <label className="block space-y-2">
-      <span className="text-sm font-medium text-[var(--foreground-primary)]">
+    <label className="block space-y-1">
+      <span className="text-[11px] font-medium text-[var(--foreground-secondary)]">
         {label}
       </span>
       {children}
       {hint ? (
-        <span className="block text-xs text-[var(--foreground-secondary)]">
+        <span className="block text-[11px] text-[var(--foreground-muted)]">
           {hint}
         </span>
       ) : null}
@@ -35,7 +35,7 @@ export function AuthInput(props: InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className={cn(
-        'w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--foreground-primary)] transition outline-none placeholder:text-[var(--foreground-muted)] focus:border-[var(--border-strong)] focus:ring-2 focus:ring-[var(--accent-soft)]',
+        'h-9 w-full rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--control-background)] px-3 py-1.5 text-[13px] text-[var(--foreground-primary)] transition outline-none placeholder:text-[var(--foreground-muted)] focus:border-[var(--brand-primary)]',
         props.className,
       )}
     />
@@ -50,7 +50,7 @@ export function AuthButton({
     <button
       {...props}
       className={cn(
-        'inline-flex w-full items-center justify-center rounded-2xl bg-[var(--brand-primary)] px-4 py-3 text-sm font-medium text-[var(--foreground-inverse)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex h-9 w-full items-center justify-center rounded-[var(--radius-control)] bg-[var(--brand-primary)] px-3 text-xs font-medium text-[var(--foreground-inverse)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60',
         className,
       )}
     />
@@ -65,7 +65,7 @@ export function SecondaryButton({
     <button
       {...props}
       className={cn(
-        'inline-flex items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] px-4 py-3 text-sm font-medium text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)] disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex h-9 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--control-background)] px-3 text-xs font-medium text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)] disabled:cursor-not-allowed disabled:opacity-60',
         className,
       )}
     />

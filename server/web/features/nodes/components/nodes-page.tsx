@@ -3,6 +3,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import {
+  Activity,
+  AlertCircle,
+  Filter,
+  Power,
+  PowerOff,
+  RefreshCw,
+  RotateCcw,
+  ScanLine,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -56,30 +68,29 @@ function CompactMetric({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] px-4 py-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-xs font-medium text-[var(--foreground-secondary)]">
+    <div className="flex min-h-11 items-center justify-between gap-2 px-2.5 py-1.5">
+      <div className="min-w-0">
+        <span className="block truncate text-[10px] font-medium text-[var(--foreground-secondary)]">
           {label}
         </span>
-        <span className="text-xl font-semibold text-[var(--foreground-primary)] tabular-nums">
-          {value}
-        </span>
+        {hint ? (
+          <span
+            className="block truncate text-[9px] text-[var(--foreground-muted)]"
+            title={hint}
+          >
+            {hint}
+          </span>
+        ) : null}
       </div>
-      {hint ? (
-        <p className="mt-1 truncate text-[11px] text-[var(--foreground-muted)]">
-          {hint}
-        </p>
-      ) : null}
+      <span className="shrink-0 text-sm font-semibold text-[var(--foreground-primary)] tabular-nums">
+        {value}
+      </span>
     </div>
   );
 }
 
 function CompactPanel({ children }: { children: ReactNode }) {
-  return (
-    <section className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-soft)]">
-      {children}
-    </section>
-  );
+  return <section className="app-panel">{children}</section>;
 }
 
 function nodeStatus(node: ProxyNodeItem) {
@@ -270,35 +281,32 @@ export function NodesPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <PageHeader
         title="节点池"
-        description="集中查看节点可用性、延迟与隔离状态；后台探测会自动把连续失败节点移出 Mihomo 运行配置。"
         action={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             <SecondaryButton
               type="button"
-              className="!rounded-xl !px-3 !py-2"
               onClick={() => setAutoRefresh((value) => !value)}
             >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
               {autoRefresh ? '停止刷新' : '自动刷新'}
             </SecondaryButton>
             <SecondaryButton
               type="button"
-              className="!rounded-xl !px-3 !py-2"
               onClick={() => healthRunMutation.mutate()}
               disabled={healthRunMutation.isPending}
             >
-              {healthRunMutation.isPending
-                ? '全量探测中...'
-                : '探测全部启用节点'}
+              <Activity className="h-3.5 w-3.5" aria-hidden="true" />
+              {healthRunMutation.isPending ? '探测中...' : '全量探测'}
             </SecondaryButton>
             <PrimaryButton
               type="button"
-              className="!rounded-xl !px-3 !py-2"
               onClick={() => setIsImportModalOpen(true)}
             >
-              导入节点
+              <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+              导入
             </PrimaryButton>
           </div>
         }
@@ -311,7 +319,7 @@ export function NodesPage() {
         <InlineMessage tone="danger" message={capabilityQuery.data.message} />
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+      <div className="metric-strip grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
         <CompactMetric label="节点总数" value={summary?.total ?? '—'} />
         <CompactMetric label="已启用" value={summary?.enabled ?? '—'} />
         <CompactMetric label="当前可用" value={summary?.healthy ?? '—'} />
@@ -333,7 +341,7 @@ export function NodesPage() {
       </div>
 
       <CompactPanel>
-        <div className="grid gap-2 p-3 lg:grid-cols-[minmax(16rem,1fr)_11rem_11rem_auto]">
+        <div className="grid gap-1.5 p-1.5 lg:grid-cols-[minmax(16rem,1fr)_9rem_9rem_auto]">
           <ResourceInput
             value={keywordInput}
             onChange={(event) => setKeywordInput(event.target.value)}
@@ -342,7 +350,6 @@ export function NodesPage() {
                 applyFilters();
               }
             }}
-            className="!rounded-xl !px-3 !py-2"
             placeholder="搜索名称、协议或服务器地址"
             aria-label="节点关键字"
           />
@@ -351,7 +358,6 @@ export function NodesPage() {
             onChange={(event) =>
               setEnabledFilter(event.target.value as 'all' | 'true' | 'false')
             }
-            className="!rounded-xl !px-3 !py-2"
             aria-label="启用状态"
           >
             <option value="all">全部启用状态</option>
@@ -363,7 +369,6 @@ export function NodesPage() {
             onChange={(event) =>
               setHealthFilter(event.target.value as HealthFilter)
             }
-            className="!rounded-xl !px-3 !py-2"
             aria-label="健康状态"
           >
             <option value="all">全部健康状态</option>
@@ -372,19 +377,13 @@ export function NodesPage() {
             <option value="unknown">待检测</option>
             <option value="quarantined">已隔离</option>
           </ResourceSelect>
-          <div className="flex gap-2">
-            <PrimaryButton
-              type="button"
-              className="!rounded-xl !px-3 !py-2"
-              onClick={applyFilters}
-            >
+          <div className="flex gap-1.5">
+            <PrimaryButton type="button" onClick={applyFilters}>
+              <Filter className="h-3.5 w-3.5" aria-hidden="true" />
               筛选
             </PrimaryButton>
-            <SecondaryButton
-              type="button"
-              className="!rounded-xl !px-3 !py-2"
-              onClick={resetFilters}
-            >
+            <SecondaryButton type="button" onClick={resetFilters}>
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               重置
             </SecondaryButton>
           </div>
@@ -392,8 +391,8 @@ export function NodesPage() {
       </CompactPanel>
 
       <CompactPanel>
-        <div className="flex flex-col gap-2 border-b border-[var(--border-default)] px-3 py-2.5 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--foreground-secondary)]">
+        <div className="flex min-h-9 flex-col gap-1.5 border-b border-[var(--border-default)] bg-[var(--surface-base)] px-2 py-1.5 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-[var(--foreground-secondary)]">
             <span>显示 {nodes.length} 个节点</span>
             <span>已选择 {selectedIds.length} 个</span>
             {summary && summary.total > nodeListLimit ? (
@@ -402,10 +401,9 @@ export function NodesPage() {
               </span>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             <SecondaryButton
               type="button"
-              className="!rounded-lg !px-2.5 !py-1.5 !text-xs"
               onClick={toggleVisibleSelection}
               disabled={nodes.length === 0}
             >
@@ -413,7 +411,6 @@ export function NodesPage() {
             </SecondaryButton>
             <SecondaryButton
               type="button"
-              className="!rounded-lg !px-2.5 !py-1.5 !text-xs"
               onClick={() => testMutation.mutate(selectedIds)}
               disabled={selectedIds.length === 0 || testMutation.isPending}
             >
@@ -421,7 +418,6 @@ export function NodesPage() {
             </SecondaryButton>
             <DangerButton
               type="button"
-              className="!rounded-lg !px-2.5 !py-1.5 !text-xs"
               onClick={() => {
                 if (
                   selectedIds.length > 0 &&
@@ -442,12 +438,12 @@ export function NodesPage() {
         </div>
 
         {nodesQuery.isLoading ? (
-          <div className="p-4">
+          <div className="p-3">
             <LoadingState />
           </div>
         ) : null}
         {nodesQuery.isError ? (
-          <div className="p-4">
+          <div className="p-3">
             <ErrorState
               title="加载节点失败"
               description={getErrorMessage(nodesQuery.error)}
@@ -455,7 +451,7 @@ export function NodesPage() {
           </div>
         ) : null}
         {!nodesQuery.isLoading && !nodesQuery.isError && nodes.length === 0 ? (
-          <div className="p-4">
+          <div className="p-3">
             <EmptyState
               title="没有匹配节点"
               description="调整筛选条件，或导入 Clash/Mihomo 配置与订阅。"
@@ -464,11 +460,11 @@ export function NodesPage() {
         ) : null}
 
         {!nodesQuery.isLoading && !nodesQuery.isError && nodes.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px] border-collapse text-left text-xs">
-              <thead className="bg-[var(--surface-muted)] text-[var(--foreground-secondary)]">
+          <div className="max-h-[calc(100vh-290px)] overflow-auto">
+            <table className="w-full min-w-[1180px] border-collapse text-left text-[11px]">
+              <thead className="sticky top-0 z-10 bg-[var(--surface-muted)] text-[10px] text-[var(--foreground-secondary)]">
                 <tr>
-                  <th className="w-10 px-3 py-2 font-medium">
+                  <th className="w-9 px-2 py-1.5 font-medium">
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
@@ -477,15 +473,15 @@ export function NodesPage() {
                       className="h-4 w-4 accent-[var(--brand-primary)]"
                     />
                   </th>
-                  <th className="w-24 px-2 py-2 font-medium">状态</th>
-                  <th className="min-w-56 px-2 py-2 font-medium">节点</th>
-                  <th className="min-w-56 px-2 py-2 font-medium">出口地址</th>
-                  <th className="min-w-40 px-2 py-2 font-medium">
-                    来源 / 标签
-                  </th>
-                  <th className="w-28 px-2 py-2 font-medium">延迟</th>
-                  <th className="w-36 px-2 py-2 font-medium">最近探测</th>
-                  <th className="w-56 px-3 py-2 text-right font-medium">
+                  <th className="w-20 px-2 py-1.5 font-medium">状态</th>
+                  <th className="min-w-56 px-2 py-1.5 font-medium">节点</th>
+                  <th className="w-20 px-2 py-1.5 font-medium">协议</th>
+                  <th className="min-w-52 px-2 py-1.5 font-medium">出口地址</th>
+                  <th className="min-w-36 px-2 py-1.5 font-medium">来源</th>
+                  <th className="min-w-36 px-2 py-1.5 font-medium">标签</th>
+                  <th className="w-20 px-2 py-1.5 font-medium">延迟</th>
+                  <th className="w-28 px-2 py-1.5 font-medium">最近探测</th>
+                  <th className="w-24 px-2 py-1.5 text-right font-medium">
                     操作
                   </th>
                 </tr>
@@ -498,7 +494,7 @@ export function NodesPage() {
                       key={node.id}
                       className="border-t border-[var(--border-default)] transition hover:bg-[var(--surface-muted)]/70"
                     >
-                      <td className="px-3 py-2.5 align-middle">
+                      <td className="h-8 px-2 py-0 align-middle">
                         <input
                           type="checkbox"
                           checked={selectedIdSet.has(node.id)}
@@ -513,58 +509,75 @@ export function NodesPage() {
                           className="h-4 w-4 accent-[var(--brand-primary)]"
                         />
                       </td>
-                      <td className="px-2 py-2.5 align-middle">
+                      <td className="h-8 px-2 py-0 align-middle">
                         <StatusBadge
                           label={status.label}
                           variant={status.variant}
-                          className="!px-2 !py-0.5"
+                          className="w-fit"
                         />
                       </td>
-                      <td className="px-2 py-2.5 align-middle">
-                        <p
-                          className="max-w-64 truncate font-medium text-[var(--foreground-primary)]"
-                          title={node.name}
-                        >
-                          {node.name}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-[var(--foreground-muted)]">
-                          #{node.id} · {node.type.toUpperCase()}
-                          {node.consecutive_failures > 0
-                            ? ` · 连续失败 ${node.consecutive_failures}`
-                            : ''}
-                        </p>
-                      </td>
-                      <td className="px-2 py-2.5 align-middle font-mono text-[11px] text-[var(--foreground-secondary)]">
-                        <span
-                          className="block max-w-64 truncate"
-                          title={`${node.server}:${node.port}`}
-                        >
-                          {node.server}:{node.port}
-                        </span>
-                        {node.last_test_error ? (
-                          <span
-                            className="mt-0.5 block max-w-64 truncate text-[var(--status-danger-foreground)]"
-                            title={node.last_test_error}
-                          >
-                            {node.last_test_error}
+                      <td className="h-8 px-2 py-0 align-middle">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="shrink-0 font-mono text-[9px] text-[var(--foreground-muted)]">
+                            #{node.id}
                           </span>
-                        ) : null}
+                          <span
+                            className="max-w-64 truncate font-medium text-[var(--foreground-primary)]"
+                            title={node.name}
+                          >
+                            {node.name}
+                          </span>
+                          {node.consecutive_failures > 0 ? (
+                            <span
+                              className="shrink-0 text-[9px] text-[var(--status-danger-foreground)]"
+                              title={`连续失败 ${node.consecutive_failures} 次`}
+                            >
+                              x{node.consecutive_failures}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
-                      <td className="px-2 py-2.5 align-middle text-[11px] text-[var(--foreground-secondary)]">
-                        <p
-                          className="max-w-48 truncate"
+                      <td className="h-8 px-2 py-0 align-middle font-mono text-[10px] text-[var(--foreground-secondary)] uppercase">
+                        {node.type}
+                      </td>
+                      <td className="h-8 px-2 py-0 align-middle font-mono text-[10px] text-[var(--foreground-secondary)]">
+                        <span className="flex min-w-0 items-center gap-1">
+                          <span
+                            className="block max-w-64 truncate"
+                            title={`${node.server}:${node.port}`}
+                          >
+                            {node.server}:{node.port}
+                          </span>
+                          {node.last_test_error ? (
+                            <span
+                              title={node.last_test_error}
+                              aria-label={node.last_test_error}
+                            >
+                              <AlertCircle
+                                className="h-3 w-3 shrink-0 text-[var(--status-danger-foreground)]"
+                                aria-hidden="true"
+                              />
+                            </span>
+                          ) : null}
+                        </span>
+                      </td>
+                      <td className="h-8 px-2 py-0 align-middle text-[10px] text-[var(--foreground-secondary)]">
+                        <span
+                          className="block max-w-44 truncate"
                           title={node.source_config_name}
                         >
                           {node.source_config_name}
-                        </p>
-                        <p
-                          className="mt-0.5 max-w-48 truncate text-[var(--foreground-muted)]"
+                        </span>
+                      </td>
+                      <td className="h-8 px-2 py-0 align-middle text-[10px] text-[var(--foreground-muted)]">
+                        <span
+                          className="block max-w-44 truncate"
                           title={node.tags || '未设置标签'}
                         >
-                          {node.tags || '未设置标签'}
-                        </p>
+                          {node.tags || '—'}
+                        </span>
                       </td>
-                      <td className="px-2 py-2.5 align-middle tabular-nums">
+                      <td className="h-8 px-2 py-0 align-middle tabular-nums">
                         {node.last_latency_ms !== undefined ? (
                           <span className="font-medium text-[var(--foreground-primary)]">
                             {node.last_latency_ms} ms
@@ -576,7 +589,7 @@ export function NodesPage() {
                         )}
                       </td>
                       <td
-                        className="px-2 py-2.5 align-middle text-[11px] text-[var(--foreground-secondary)]"
+                        className="h-8 px-2 py-0 align-middle text-[10px] text-[var(--foreground-secondary)]"
                         title={
                           node.last_tested_at
                             ? formatDateTime(node.last_tested_at)
@@ -587,19 +600,24 @@ export function NodesPage() {
                           ? formatRelativeTime(node.last_tested_at)
                           : '尚未探测'}
                       </td>
-                      <td className="px-3 py-2.5 align-middle">
-                        <div className="flex justify-end gap-1.5">
-                          <SecondaryButton
+                      <td className="h-8 px-2 py-0 align-middle">
+                        <div className="flex justify-end gap-1">
+                          <button
                             type="button"
-                            className="!rounded-lg !px-2.5 !py-1.5 !text-xs"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--foreground-secondary)] hover:bg-[var(--control-background-hover)] hover:text-[var(--foreground-primary)] disabled:opacity-40"
                             onClick={() => testMutation.mutate([node.id])}
                             disabled={testMutation.isPending}
+                            title="探测节点"
+                            aria-label={`探测 ${node.name}`}
                           >
-                            探测
-                          </SecondaryButton>
-                          <SecondaryButton
+                            <ScanLine
+                              className="h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
+                          </button>
+                          <button
                             type="button"
-                            className="!rounded-lg !px-2.5 !py-1.5 !text-xs"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--foreground-secondary)] hover:bg-[var(--control-background-hover)] hover:text-[var(--foreground-primary)] disabled:opacity-40"
                             onClick={() =>
                               statusMutation.mutate({
                                 id: node.id,
@@ -607,12 +625,24 @@ export function NodesPage() {
                               })
                             }
                             disabled={statusMutation.isPending}
+                            title={node.enabled ? '禁用节点' : '启用节点'}
+                            aria-label={`${node.enabled ? '禁用' : '启用'} ${node.name}`}
                           >
-                            {node.enabled ? '禁用' : '启用'}
-                          </SecondaryButton>
-                          <DangerButton
+                            {node.enabled ? (
+                              <PowerOff
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <Power
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </button>
+                          <button
                             type="button"
-                            className="!rounded-lg !px-2.5 !py-1.5 !text-xs"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--status-danger-foreground)] hover:bg-[var(--status-danger-soft)] disabled:opacity-40"
                             onClick={() => {
                               if (
                                 window.confirm(`确认删除节点“${node.name}”吗？`)
@@ -621,9 +651,14 @@ export function NodesPage() {
                               }
                             }}
                             disabled={deleteMutation.isPending}
+                            title="删除节点"
+                            aria-label={`删除 ${node.name}`}
                           >
-                            删除
-                          </DangerButton>
+                            <Trash2
+                              className="h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
+                          </button>
                         </div>
                       </td>
                     </tr>

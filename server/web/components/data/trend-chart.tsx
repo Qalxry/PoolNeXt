@@ -55,10 +55,10 @@ export function TrendChart({
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+        backgroundColor: 'rgba(21, 24, 27, 0.96)',
         borderWidth: 0,
         textStyle: {
-          color: '#e2e8f0',
+          color: '#e7e9ea',
           fontSize: 12,
         },
         formatter: (params: unknown) => {
@@ -84,7 +84,7 @@ export function TrendChart({
 
             return [
               '<span style="display:inline-flex;align-items:center;gap:8px;">',
-              `<span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${item.color ?? '#94a3b8'};"></span>`,
+              `<span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${item.color ?? '#aeb5bb'};"></span>`,
               `<span>${item.seriesName ?? ''}</span>`,
               `<strong style="margin-left:8px;">${formatter(numericValue)}</strong>`,
               '</span>',
@@ -103,14 +103,14 @@ export function TrendChart({
         data: labels,
         axisLine: {
           lineStyle: {
-            color: 'rgba(148, 163, 184, 0.24)',
+            color: 'rgba(174, 181, 187, 0.22)',
           },
         },
         axisTick: {
           show: false,
         },
         axisLabel: {
-          color: '#94a3b8',
+          color: '#aeb5bb',
           margin: 14,
         },
       },
@@ -120,12 +120,12 @@ export function TrendChart({
         max: maxValue,
         splitNumber: 4,
         axisLabel: {
-          color: '#94a3b8',
+          color: '#aeb5bb',
           formatter: (value: number) => axisFormatter(value),
         },
         splitLine: {
           lineStyle: {
-            color: 'rgba(148, 163, 184, 0.16)',
+            color: 'rgba(174, 181, 187, 0.14)',
             type: 'dashed',
           },
         },
@@ -161,14 +161,14 @@ export function TrendChart({
 
   if (labels.length === 0 || series.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-3xl border border-dashed border-[var(--border-default)] bg-[var(--surface-muted)] text-sm text-[var(--foreground-secondary)]">
+      <div className="flex h-[220px] items-center justify-center rounded-[var(--radius-panel)] border border-dashed border-[var(--border-default)] bg-[var(--surface-muted)] text-sm text-[var(--foreground-secondary)]">
         暂无趋势数据
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       <div className="flex flex-wrap gap-3">
         {series.map((item) => {
           const latestValue = item.values[item.values.length - 1] ?? 0;
@@ -176,7 +176,7 @@ export function TrendChart({
           return (
             <div
               key={item.label}
-              className="min-w-[140px] rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3"
+              className="min-w-[140px] rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3"
             >
               <div className="flex items-center gap-2">
                 <span
@@ -195,7 +195,7 @@ export function TrendChart({
         })}
       </div>
 
-      <div className="overflow-hidden rounded-[28px] border border-[var(--border-default)] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0))] px-4 py-4">
+      <div className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-default)] bg-[var(--surface-base)] px-3 py-2.5">
         <ReactECharts
           option={option}
           notMerge

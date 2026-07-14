@@ -2,6 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  Plus,
+  Save,
+  Trash2,
+} from 'lucide-react';
 
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -445,13 +453,13 @@ export function WorkspacePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader
-        title="工作台"
-        description="创建端口配置、选择节点与策略，并生成后续可合并的工作台配置片段。"
+        title="编排"
         action={
           <SecondaryButton type="button" onClick={handleCreateNew}>
-            新建端口配置
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            新建配置
           </SecondaryButton>
         }
       />
@@ -463,13 +471,10 @@ export function WorkspacePage() {
         <InlineMessage tone="info" message={capability.message} />
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <AppCard
-            title="端口配置"
-            description="左侧维护当前工作台的端口配置集合。"
-          >
-            <div className="space-y-3">
+      <div className="grid gap-3 xl:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="space-y-3">
+          <AppCard title="端口配置">
+            <div className="space-y-1.5">
               {profilesQuery.isLoading ? <LoadingState /> : null}
               {profilesQuery.isError ? (
                 <ErrorState
@@ -494,51 +499,51 @@ export function WorkspacePage() {
                     setSelectedProfileId(item.profile.id);
                     setFeedback(null);
                   }}
-                  className={`w-full rounded-2xl border p-4 text-left transition ${
+                  title={`更新于 ${formatDateTime(item.profile.updated_at)}`}
+                  className={`flex h-10 w-full items-center gap-2 rounded-[var(--radius-control)] border px-2 text-left text-[11px] transition ${
                     selectedProfileId === item.profile.id
                       ? 'border-[var(--border-strong)] bg-[var(--accent-soft)]'
-                      : 'border-[var(--border-default)] bg-[var(--surface-muted)] hover:bg-[var(--surface-base)]'
+                      : 'border-[var(--border-default)] bg-[var(--surface-base)] hover:bg-[var(--control-background-hover)]'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-[var(--foreground-primary)]">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-[var(--foreground-primary)]">
                       {item.profile.name}
                     </p>
-                    <div
-                      className="flex items-center gap-2"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <Switch
-                        id={`profile-runtime-${item.profile.id}`}
-                        checked={item.profile.include_in_runtime}
-                        disabled={toggleRuntimeInclusionMutation.isPending}
-                        onCheckedChange={(checked) => {
-                          setFeedback(null);
-                          toggleRuntimeInclusionMutation.mutate({
-                            item,
-                            checked,
-                          });
-                        }}
-                      />
-                    </div>
+                    <p className="truncate text-[9px] text-[var(--foreground-muted)]">
+                      :
+                      {item.profile.mixed_port ||
+                        item.profile.socks_port ||
+                        item.profile.http_port}{' '}
+                      · {item.profile.proxy_settings.strategy_type} ·{' '}
+                      {item.node_ids.length} 节点
+                    </p>
                   </div>
-                  <div className="mt-2 text-xs leading-6 text-[var(--foreground-secondary)]">
-                    <p>Mixed：{item.profile.mixed_port}</p>
-                    <p>策略：{item.profile.proxy_settings.strategy_type}</p>
-                    <p>节点数：{item.node_ids.length}</p>
-                    <p>更新：{formatDateTime(item.profile.updated_at)}</p>
+                  <div
+                    className="shrink-0"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <Switch
+                      id={`profile-runtime-${item.profile.id}`}
+                      checked={item.profile.include_in_runtime}
+                      disabled={toggleRuntimeInclusionMutation.isPending}
+                      onCheckedChange={(checked) => {
+                        setFeedback(null);
+                        toggleRuntimeInclusionMutation.mutate({
+                          item,
+                          checked,
+                        });
+                      }}
+                    />
                   </div>
                 </button>
               ))}
             </div>
           </AppCard>
 
-          <AppCard
-            title="模板"
-            description="保存常用工作台配置，后续可直接套用。"
-          >
-            <div className="space-y-4">
-              <div className="flex gap-2">
+          <AppCard title="模板">
+            <div className="space-y-2">
+              <div className="flex gap-1.5">
                 <ResourceInput
                   value={templateName}
                   onChange={(event) => setTemplateName(event.target.value)}
@@ -564,39 +569,37 @@ export function WorkspacePage() {
                   description="保存一个常用工作台配置作为模板。"
                 />
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   {templateList.map((item) => (
                     <div
                       key={item.template.id}
-                      className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4"
+                      className="flex min-h-9 items-center justify-between gap-2 rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)] px-2 py-1.5"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-[var(--foreground-primary)]">
-                            {item.template.name}
-                          </p>
-                          <p className="text-xs text-[var(--foreground-secondary)]">
-                            {item.template.proxy_settings.strategy_type} · 节点{' '}
-                            {item.node_ids.length} 个
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <SecondaryButton
-                            type="button"
-                            onClick={() => applyTemplate(item)}
-                          >
-                            套用
-                          </SecondaryButton>
-                          <DangerButton
-                            type="button"
-                            onClick={() =>
-                              deleteTemplateMutation.mutate(item.template.id)
-                            }
-                            disabled={deleteTemplateMutation.isPending}
-                          >
-                            删除
-                          </DangerButton>
-                        </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-semibold text-[var(--foreground-primary)]">
+                          {item.template.name}
+                        </p>
+                        <p className="text-[9px] text-[var(--foreground-secondary)]">
+                          {item.template.proxy_settings.strategy_type} · 节点{' '}
+                          {item.node_ids.length} 个
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <SecondaryButton
+                          type="button"
+                          onClick={() => applyTemplate(item)}
+                        >
+                          套用
+                        </SecondaryButton>
+                        <DangerButton
+                          type="button"
+                          onClick={() =>
+                            deleteTemplateMutation.mutate(item.template.id)
+                          }
+                          disabled={deleteTemplateMutation.isPending}
+                        >
+                          删除
+                        </DangerButton>
                       </div>
                     </div>
                   ))}
@@ -606,12 +609,11 @@ export function WorkspacePage() {
           </AppCard>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-3">
           <AppCard
             title="端口配置表单"
-            description="保存前可先生成片段预览，确认监听入口、策略和节点绑定是否符合预期。"
             action={
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 <PrimaryButton
                   type="button"
                   onClick={() => {
@@ -620,6 +622,7 @@ export function WorkspacePage() {
                   }}
                   disabled={previewMutation.isPending}
                 >
+                  <Save className="h-3.5 w-3.5" aria-hidden="true" />
                   {previewMutation.isPending ? '生成中...' : '生成片段预览'}
                 </PrimaryButton>
                 {!isCreating && selectedProfileId ? (
@@ -632,6 +635,7 @@ export function WorkspacePage() {
                       }}
                       disabled={updateMutation.isPending}
                     >
+                      <Save className="h-3.5 w-3.5" aria-hidden="true" />
                       {updateMutation.isPending ? '保存中...' : '保存配置'}
                     </PrimaryButton>
                     <DangerButton
@@ -645,6 +649,7 @@ export function WorkspacePage() {
                       }}
                       disabled={deleteMutation.isPending}
                     >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       删除
                     </DangerButton>
                   </>
@@ -663,7 +668,7 @@ export function WorkspacePage() {
               </div>
             }
           >
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="grid gap-2.5 xl:grid-cols-2">
               <ResourceField
                 label="策略组名称"
                 hint={`${strategyDescription[payload.proxy_settings.strategy_type]}；该名称会作为端口配置名称，且必须唯一。`}
@@ -691,7 +696,7 @@ export function WorkspacePage() {
                   placeholder="127.0.0.1"
                 />
               </ResourceField>
-              <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4 xl:col-span-2">
+              <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)] p-2.5 xl:col-span-2">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-[var(--foreground-primary)]">
@@ -720,7 +725,7 @@ export function WorkspacePage() {
                     <Label htmlFor="use-mixed-port">启用 Mixed 端口</Label>
                   </div>
                 </div>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="mt-2 grid gap-2.5 md:grid-cols-2">
                   {usesMixedPort ? (
                     <ResourceField
                       label="Mixed 端口"
@@ -855,13 +860,13 @@ export function WorkspacePage() {
                     </ResourceSelect>
                   </ResourceField>
                   <div className="grid gap-3 lg:grid-cols-2">
-                    <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4">
+                    <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)] p-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <div className="space-y-1">
                           <Label htmlFor="load-balance-lazy">
                             延迟懒加载探测
                           </Label>
-                          <p className="text-xs text-[var(--foreground-secondary)]">
+                          <p className="text-[11px] leading-4 text-[var(--foreground-secondary)]">
                             只在需要时触发健康检查，减少空载时的探测请求。
                           </p>
                         </div>
@@ -880,13 +885,13 @@ export function WorkspacePage() {
                         />
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4">
+                    <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)] p-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <div className="space-y-1">
                           <Label htmlFor="load-balance-disable-udp">
                             禁用 UDP
                           </Label>
-                          <p className="text-xs text-[var(--foreground-secondary)]">
+                          <p className="text-[11px] leading-4 text-[var(--foreground-secondary)]">
                             为当前负载均衡组关闭 UDP 转发，适合只处理 TCP
                             的场景。
                           </p>
@@ -911,19 +916,19 @@ export function WorkspacePage() {
                   </div>
                 </>
               ) : null}
-              <details className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] p-4 xl:col-span-2">
-                <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--foreground-primary)]">
+              <details className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)] p-2.5 xl:col-span-2">
+                <summary className="cursor-pointer list-none text-xs font-semibold text-[var(--foreground-primary)]">
                   高级设置
                 </summary>
-                <p className="mt-2 text-xs text-[var(--foreground-secondary)]">
+                <p className="mt-1 text-[11px] text-[var(--foreground-secondary)]">
                   UDP 默认开启，监听鉴权默认关闭；仅在需要时展开配置。
                 </p>
-                <div className="mt-4 grid gap-3">
-                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-base)] p-4">
+                <div className="mt-2 grid gap-2">
+                  <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-panel)] p-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="space-y-1">
                         <Label htmlFor="advanced-udp-enabled">UDP</Label>
-                        <p className="text-xs text-[var(--foreground-secondary)]">
+                        <p className="text-[11px] leading-4 text-[var(--foreground-secondary)]">
                           控制当前监听入口是否允许 UDP 转发。
                         </p>
                       </div>
@@ -942,11 +947,11 @@ export function WorkspacePage() {
                       />
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-base)] p-4">
+                  <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-panel)] p-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="space-y-1">
                         <Label htmlFor="advanced-auth-enabled">开启鉴权</Label>
-                        <p className="text-xs text-[var(--foreground-secondary)]">
+                        <p className="text-[11px] leading-4 text-[var(--foreground-secondary)]">
                           开启后会为当前监听入口生成 `users` 凭据列表。
                         </p>
                       </div>
@@ -971,7 +976,7 @@ export function WorkspacePage() {
                       />
                     </div>
                     {payload.proxy_settings.auth_enabled ? (
-                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <div className="mt-2 grid gap-2.5 md:grid-cols-2">
                         <ResourceField label="鉴权用户名">
                           <ResourceInput
                             value={payload.proxy_settings.auth_username}
@@ -1010,11 +1015,8 @@ export function WorkspacePage() {
             </div>
           </AppCard>
 
-          <AppCard
-            title="节点选择器"
-            description="无分页展示最多 1000 个节点；已选节点置顶，顺序即 fallback 优先级。"
-          >
-            <div className="space-y-3">
+          <AppCard title="节点选择器">
+            <div className="space-y-2">
               <div className="flex flex-col gap-2 md:flex-row md:items-end">
                 <ResourceField label="搜索节点" className="min-w-0 flex-1">
                   <ResourceInput
@@ -1023,7 +1025,7 @@ export function WorkspacePage() {
                     placeholder="名称、协议或出口地址"
                   />
                 </ResourceField>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   <SecondaryButton
                     type="button"
                     onClick={selectVisibleAvailableNodes}
@@ -1045,10 +1047,9 @@ export function WorkspacePage() {
                   </SecondaryButton>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-4 text-xs text-[var(--foreground-secondary)]">
+              <div className="flex flex-wrap gap-2.5 text-[11px] text-[var(--foreground-secondary)]">
                 <span>当前结果 {displayedNodeOptions.length}</span>
                 <span>已选 {payload.node_ids.length}</span>
-                <span>首个可用节点优先承载连接</span>
               </div>
               {nodeOptionsQuery.isLoading ? <LoadingState /> : null}
               {nodeOptionsQuery.isError ? (
@@ -1058,20 +1059,28 @@ export function WorkspacePage() {
                 />
               ) : null}
               {!nodeOptionsQuery.isLoading && !nodeOptionsQuery.isError ? (
-                <div className="max-h-[460px] overflow-auto rounded-lg border border-[var(--border-default)]">
-                  <table className="w-full min-w-[900px] border-collapse text-left text-xs">
-                    <thead className="sticky top-0 z-10 bg-[var(--surface-muted)] text-[var(--foreground-secondary)]">
+                <div className="max-h-[460px] overflow-auto rounded-[var(--radius-control)] border border-[var(--border-default)]">
+                  <table className="w-full min-w-[1080px] border-collapse text-left text-[11px]">
+                    <thead className="sticky top-0 z-10 bg-[var(--surface-muted)] text-[10px] text-[var(--foreground-secondary)]">
                       <tr>
-                        <th className="w-10 px-3 py-2 font-medium">选</th>
-                        <th className="w-16 px-2 py-2 font-medium">优先级</th>
-                        <th className="w-24 px-2 py-2 font-medium">状态</th>
-                        <th className="min-w-56 px-2 py-2 font-medium">节点</th>
-                        <th className="min-w-52 px-2 py-2 font-medium">出口</th>
-                        <th className="min-w-44 px-2 py-2 font-medium">
-                          来源 / 标签
+                        <th className="w-9 px-2 py-1.5 font-medium">选</th>
+                        <th className="w-14 px-2 py-1.5 font-medium">优先级</th>
+                        <th className="w-20 px-2 py-1.5 font-medium">状态</th>
+                        <th className="min-w-52 px-2 py-1.5 font-medium">
+                          节点
                         </th>
-                        <th className="w-24 px-2 py-2 font-medium">延迟</th>
-                        <th className="w-20 px-3 py-2 text-right font-medium">
+                        <th className="w-20 px-2 py-1.5 font-medium">协议</th>
+                        <th className="min-w-48 px-2 py-1.5 font-medium">
+                          出口
+                        </th>
+                        <th className="min-w-36 px-2 py-1.5 font-medium">
+                          来源
+                        </th>
+                        <th className="min-w-32 px-2 py-1.5 font-medium">
+                          标签
+                        </th>
+                        <th className="w-20 px-2 py-1.5 font-medium">延迟</th>
+                        <th className="w-16 px-2 py-1.5 text-right font-medium">
                           排序
                         </th>
                       </tr>
@@ -1089,7 +1098,7 @@ export function WorkspacePage() {
                                 : 'border-t border-[var(--border-default)] hover:bg-[var(--surface-muted)]/70'
                             }
                           >
-                            <td className="px-3 py-2 align-middle">
+                            <td className="h-8 px-2 py-0 align-middle">
                               <input
                                 type="checkbox"
                                 checked={selectedIndex >= 0}
@@ -1103,66 +1112,80 @@ export function WorkspacePage() {
                                 className="h-4 w-4 accent-[var(--brand-primary)]"
                               />
                             </td>
-                            <td className="px-2 py-2 text-center font-mono tabular-nums">
+                            <td className="h-8 px-2 py-0 text-center font-mono tabular-nums">
                               {selectedIndex >= 0 ? selectedIndex + 1 : '—'}
                             </td>
-                            <td className="px-2 py-2">
+                            <td className="h-8 px-2 py-0">
                               <StatusBadge
                                 label={status.label}
                                 variant={status.variant}
-                                className="!px-2 !py-0.5"
+                                className="w-fit"
                               />
                             </td>
-                            <td className="px-2 py-2">
-                              <p
-                                className="max-w-64 truncate font-medium text-[var(--foreground-primary)]"
-                                title={node.name}
-                              >
-                                {node.name}
-                              </p>
-                              <p className="mt-0.5 text-[11px] text-[var(--foreground-muted)]">
-                                #{node.id} · {node.type.toUpperCase()}
-                                {node.consecutive_failures > 0
-                                  ? ` · 连续失败 ${node.consecutive_failures}`
-                                  : ''}
-                              </p>
-                            </td>
-                            <td className="px-2 py-2 font-mono text-[11px] text-[var(--foreground-secondary)]">
-                              <span
-                                className="block max-w-60 truncate"
-                                title={`${node.server}:${node.port}`}
-                              >
-                                {node.server}:{node.port}
-                              </span>
-                              {node.last_test_error ? (
-                                <span
-                                  className="mt-0.5 block max-w-60 truncate text-[var(--status-danger-foreground)]"
-                                  title={node.last_test_error}
-                                >
-                                  {node.last_test_error}
+                            <td className="h-8 px-2 py-0">
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                <span className="shrink-0 font-mono text-[9px] text-[var(--foreground-muted)]">
+                                  #{node.id}
                                 </span>
-                              ) : null}
+                                <span
+                                  className="max-w-56 truncate font-medium text-[var(--foreground-primary)]"
+                                  title={node.name}
+                                >
+                                  {node.name}
+                                </span>
+                                {node.consecutive_failures > 0 ? (
+                                  <span className="shrink-0 text-[9px] text-[var(--status-danger-foreground)]">
+                                    x{node.consecutive_failures}
+                                  </span>
+                                ) : null}
+                              </div>
                             </td>
-                            <td className="px-2 py-2 text-[11px] text-[var(--foreground-secondary)]">
-                              <p
-                                className="max-w-48 truncate"
+                            <td className="h-8 px-2 py-0 font-mono text-[10px] text-[var(--foreground-secondary)] uppercase">
+                              {node.type}
+                            </td>
+                            <td className="h-8 px-2 py-0 font-mono text-[10px] text-[var(--foreground-secondary)]">
+                              <span className="flex min-w-0 items-center gap-1">
+                                <span
+                                  className="block max-w-52 truncate"
+                                  title={`${node.server}:${node.port}`}
+                                >
+                                  {node.server}:{node.port}
+                                </span>
+                                {node.last_test_error ? (
+                                  <span
+                                    title={node.last_test_error}
+                                    aria-label={node.last_test_error}
+                                  >
+                                    <AlertCircle
+                                      className="h-3 w-3 shrink-0 text-[var(--status-danger-foreground)]"
+                                      aria-hidden="true"
+                                    />
+                                  </span>
+                                ) : null}
+                              </span>
+                            </td>
+                            <td className="h-8 px-2 py-0 text-[10px] text-[var(--foreground-secondary)]">
+                              <span
+                                className="block max-w-40 truncate"
                                 title={node.source_config_name}
                               >
                                 {node.source_config_name}
-                              </p>
-                              <p
-                                className="mt-0.5 max-w-48 truncate text-[var(--foreground-muted)]"
+                              </span>
+                            </td>
+                            <td className="h-8 px-2 py-0 text-[10px] text-[var(--foreground-muted)]">
+                              <span
+                                className="block max-w-36 truncate"
                                 title={node.tags || '未设置标签'}
                               >
-                                {node.tags || '未设置标签'}
-                              </p>
+                                {node.tags || '—'}
+                              </span>
                             </td>
-                            <td className="px-2 py-2 tabular-nums">
+                            <td className="h-8 px-2 py-0 tabular-nums">
                               {node.last_latency_ms !== undefined
                                 ? `${node.last_latency_ms} ms`
                                 : '—'}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className="h-8 px-2 py-0">
                               <div className="flex justify-end gap-1">
                                 <button
                                   type="button"
@@ -1170,9 +1193,12 @@ export function WorkspacePage() {
                                   aria-label={`提高 ${node.name} 的优先级`}
                                   onClick={() => handleMoveNode(node.id, -1)}
                                   disabled={selectedIndex <= 0}
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--control-background)] text-sm disabled:opacity-35"
+                                  className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--foreground-secondary)] hover:bg-[var(--control-background-hover)] disabled:opacity-35"
                                 >
-                                  ↑
+                                  <ArrowUp
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
                                 </button>
                                 <button
                                   type="button"
@@ -1184,9 +1210,12 @@ export function WorkspacePage() {
                                     selectedIndex ===
                                       payload.node_ids.length - 1
                                   }
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--control-background)] text-sm disabled:opacity-35"
+                                  className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--foreground-secondary)] hover:bg-[var(--control-background-hover)] disabled:opacity-35"
                                 >
-                                  ↓
+                                  <ArrowDown
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
                                 </button>
                               </div>
                             </td>
@@ -1196,7 +1225,7 @@ export function WorkspacePage() {
                     </tbody>
                   </table>
                   {displayedNodeOptions.length === 0 ? (
-                    <div className="p-4">
+                    <div className="p-3">
                       <EmptyState
                         title="没有匹配节点"
                         description="调整搜索条件，或先导入节点。"
@@ -1210,7 +1239,6 @@ export function WorkspacePage() {
 
           <AppCard
             title="配置片段预览"
-            description="这里展示的是单个端口配置生成的可合并片段；最终启动文件会在运行阶段由多个片段聚合生成。"
             action={
               selectedProfileId && preview ? (
                 <PrimaryButton
@@ -1221,6 +1249,7 @@ export function WorkspacePage() {
                   }}
                   disabled={saveRuntimeMutation.isPending}
                 >
+                  <Save className="h-3.5 w-3.5" aria-hidden="true" />
                   {saveRuntimeMutation.isPending ? '保存中...' : '保存片段快照'}
                 </PrimaryButton>
               ) : null
@@ -1232,29 +1261,35 @@ export function WorkspacePage() {
                 description="填写表单并点击“生成片段预览”后，会在这里看到当前端口配置的合并片段。"
               />
             ) : (
-              <div className="space-y-4">
-                <div className="grid gap-4 lg:grid-cols-3">
-                  <AppCard title="内核" description="当前片段使用的渲染器。">
-                    <p className="text-sm font-semibold text-[var(--foreground-primary)]">
+              <div className="space-y-2">
+                <div className="metric-strip grid-cols-1 md:grid-cols-3">
+                  <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+                    <span className="text-[10px] text-[var(--foreground-muted)]">
+                      内核
+                    </span>
+                    <span className="text-xs font-semibold text-[var(--foreground-primary)]">
                       {preview.kernel_type}
-                    </p>
-                  </AppCard>
-                  <AppCard
-                    title="校验和"
-                    description="用于后续比较片段内容是否变化。"
-                  >
-                    <p className="text-xs break-all text-[var(--foreground-primary)]">
+                    </span>
+                  </div>
+                  <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+                    <span className="text-[10px] text-[var(--foreground-muted)]">
+                      校验和
+                    </span>
+                    <span
+                      className="max-w-52 truncate font-mono text-[9px] text-[var(--foreground-primary)]"
+                      title={preview.checksum}
+                    >
                       {preview.checksum}
-                    </p>
-                  </AppCard>
-                  <AppCard
-                    title="选中节点"
-                    description="本次参与片段渲染的节点数量。"
-                  >
-                    <p className="text-sm font-semibold text-[var(--foreground-primary)]">
+                    </span>
+                  </div>
+                  <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+                    <span className="text-[10px] text-[var(--foreground-muted)]">
+                      节点
+                    </span>
+                    <span className="text-sm font-semibold text-[var(--foreground-primary)] tabular-nums">
                       {preview.node_ids.length}
-                    </p>
-                  </AppCard>
+                    </span>
+                  </div>
                 </div>
                 <CodeBlock className="max-h-[480px] overflow-auto">
                   {preview.content}

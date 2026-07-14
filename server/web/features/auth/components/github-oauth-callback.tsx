@@ -71,7 +71,7 @@ export function GitHubOAuthCallback() {
 
   return (
     <AppCard title="GitHub OAuth 回调" description={prompt}>
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         {mutation.isPending ? <LoadingState /> : null}
         {message ? (
           <InlineMessage tone={message.tone} message={message.text} />

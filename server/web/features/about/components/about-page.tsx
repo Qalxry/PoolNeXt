@@ -63,38 +63,37 @@ export function AboutPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <AppCard
         title="关于 PoolNeXt"
-        description="公开展示当前系统的简介、版本信息与项目入口。"
         action={<StatusBadge label={status.version || 'dev'} variant="info" />}
       >
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] px-4 py-4">
-            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+        <div className="metric-strip grid-cols-1 md:grid-cols-3">
+          <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+            <span className="text-[10px] text-[var(--foreground-muted)]">
               系统名称
-            </p>
-            <p className="mt-2 text-sm font-medium text-[var(--foreground-primary)]">
+            </span>
+            <span className="text-xs font-medium text-[var(--foreground-primary)]">
               {status.system_name || 'PoolNeXt'}
-            </p>
+            </span>
           </div>
-          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] px-4 py-4">
-            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
-              Server 启动时间
-            </p>
-            <p className="mt-2 text-sm font-medium text-[var(--foreground-primary)]">
+          <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+            <span className="text-[10px] text-[var(--foreground-muted)]">
+              启动时间
+            </span>
+            <span className="text-[11px] font-medium text-[var(--foreground-primary)] tabular-nums">
               {formatDateTime(new Date(status.start_time * 1000))}
-            </p>
+            </span>
           </div>
-          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-muted)] px-4 py-4">
-            <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+          <div className="flex min-h-10 items-center justify-between gap-2 px-3 py-1.5">
+            <span className="text-[10px] text-[var(--foreground-muted)]">
               项目仓库
-            </p>
+            </span>
             <a
               href="https://github.com/Qalxry/PoolNeXt"
               target="_blank"
               rel="noreferrer"
-              className="mt-2 block text-sm font-medium text-[var(--brand-primary)] transition hover:opacity-80"
+              className="text-xs font-medium text-[var(--brand-primary)] transition hover:opacity-80"
             >
               项目仓库
             </a>
@@ -103,10 +102,7 @@ export function AboutPage() {
       </AppCard>
 
       {aboutContent ? (
-        <AppCard
-          title="项目介绍"
-          description="以下内容由系统设置中的“关于内容”维护。"
-        >
+        <AppCard title="项目介绍">
           <div
             className="prose prose-sm max-w-none text-[var(--foreground-primary)] [&_a]:text-[var(--brand-primary)]"
             dangerouslySetInnerHTML={{

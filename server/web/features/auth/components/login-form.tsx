@@ -92,7 +92,7 @@ export function LoginForm() {
   return (
     <PublicAuthGuard>
       <AppCard title="用户登录">
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-2.5" onSubmit={handleSubmit}>
           <AuthFormField label="用户名">
             <AuthInput
               placeholder="请输入用户名"

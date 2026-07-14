@@ -1,5 +1,7 @@
 'use client';
 
+import { Laptop, Moon, Sun } from 'lucide-react';
+
 import { cn } from '@/lib/utils/cn';
 import { themeModes, type ThemeMode } from '@/lib/theme/theme';
 import { useTheme } from '@/components/providers/theme-provider';
@@ -15,46 +17,8 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     (currentIndex + 1) % themeModes.length
   ] as ThemeMode;
 
-  const icon =
-    themeMode === 'light' ? (
-      <svg
-        className="h-5 w-5"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3" />
-      </svg>
-    ) : themeMode === 'dark' ? (
-      <svg
-        className="h-5 w-5"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M20 15.2A7.8 7.8 0 1 1 8.8 4 6.4 6.4 0 0 0 20 15.2Z" />
-      </svg>
-    ) : (
-      <svg
-        className="h-5 w-5"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="3.5" y="4" width="17" height="12" rx="2.5" />
-        <path d="M8 20h8M12 16v4" />
-      </svg>
-    );
+  const Icon =
+    themeMode === 'light' ? Sun : themeMode === 'dark' ? Moon : Laptop;
 
   const label =
     themeMode === 'light'
@@ -68,13 +32,13 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       type="button"
       onClick={() => setThemeMode(nextTheme)}
       className={cn(
-        'inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]',
+        'inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--control-background)] text-[var(--foreground-secondary)] transition hover:bg-[var(--control-background-hover)] hover:text-[var(--foreground-primary)]',
         className,
       )}
       aria-label={`当前${label}，点击切换到${nextTheme === 'light' ? '浅色模式' : nextTheme === 'dark' ? '深色模式' : '跟随系统'}`}
       title={`${label}（当前生效：${resolvedTheme === 'dark' ? '深色' : '浅色'}），点击切换到${nextTheme === 'light' ? '浅色模式' : nextTheme === 'dark' ? '深色模式' : '跟随系统'}`}
     >
-      {icon}
+      <Icon className="h-4 w-4" aria-hidden="true" />
     </button>
   );
 }

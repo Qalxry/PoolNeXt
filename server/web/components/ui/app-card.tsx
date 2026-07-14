@@ -19,21 +19,21 @@ export function AppCard({
   return (
     <section
       className={cn(
-        'rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] shadow-[var(--shadow-soft)]',
+        'overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-default)] bg-[var(--surface-panel)] shadow-[var(--shadow-soft)]',
         className,
       )}
       {...props}
     >
       {(title || description || action) && (
-        <header className="flex flex-col gap-2 border-b border-[var(--border-default)] px-4 py-3 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-1">
+        <header className="flex flex-col gap-1.5 border-b border-[var(--border-default)] bg-[var(--surface-base)] px-3 py-2 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
             {title ? (
-              <h2 className="text-sm font-semibold text-[var(--foreground-primary)]">
+              <h2 className="text-[13px] font-semibold text-[var(--foreground-primary)]">
                 {title}
               </h2>
             ) : null}
             {description ? (
-              <p className="text-xs leading-5 text-[var(--foreground-secondary)]">
+              <p className="mt-0.5 text-[11px] leading-4 text-[var(--foreground-secondary)]">
                 {description}
               </p>
             ) : null}
@@ -41,7 +41,7 @@ export function AppCard({
           {action ? <div className="shrink-0">{action}</div> : null}
         </header>
       )}
-      <div className="px-4 py-4">{children}</div>
+      <div className="p-3">{children}</div>
     </section>
   );
 }

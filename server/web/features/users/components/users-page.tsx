@@ -5,6 +5,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import {
+  Pencil,
+  Power,
+  PowerOff,
+  ShieldMinus,
+  ShieldPlus,
+  Trash2,
+} from 'lucide-react';
 
 import { EmptyState } from '@/components/feedback/empty-state';
 import { ErrorState } from '@/components/feedback/error-state';
@@ -29,7 +37,6 @@ import type {
   UserMutationPayload,
 } from '@/features/users/types';
 import {
-  DangerButton,
   PrimaryButton,
   ResourceField,
   ResourceInput,
@@ -278,11 +285,8 @@ export function UsersPage() {
 
   if (!isAdmin) {
     return (
-      <div className="space-y-6">
-        <PageHeader
-          title="用户管理"
-          description="阶段 4 已迁移用户管理页面，但当前账户没有管理员权限。"
-        />
+      <div className="space-y-3">
+        <PageHeader title="用户管理" />
         <EmptyState
           title="权限不足"
           description="用户列表、编辑与账户管理动作仅对管理员开放，请使用管理员账号登录后继续。"
@@ -293,10 +297,9 @@ export function UsersPage() {
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="space-y-3">
         <PageHeader
           title="用户管理"
-          description="支持搜索、分页、创建、编辑以及启用、封禁、权限调整等常见账户管理动作。"
           action={
             <PrimaryButton type="button" onClick={handleCreate}>
               新建用户
@@ -325,16 +328,16 @@ export function UsersPage() {
             </div>
           }
         >
-          <div className="space-y-5">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex w-full flex-col gap-3 md:flex-row">
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex w-full flex-col gap-1.5 md:flex-row">
                 <ResourceInput
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   placeholder="搜索用户 ID、用户名、显示名称或邮箱地址"
                   className="md:max-w-xl"
                 />
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   <PrimaryButton type="button" onClick={handleSearchSubmit}>
                     搜索
                   </PrimaryButton>
@@ -345,7 +348,7 @@ export function UsersPage() {
               </div>
 
               {searchKeyword.length === 0 ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   <SecondaryButton
                     type="button"
                     onClick={() => setPage((value) => Math.max(value - 1, 0))}
@@ -379,15 +382,18 @@ export function UsersPage() {
                 description="当前条件下没有可展示的用户记录。"
               />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-[var(--border-default)] text-left text-sm">
-                  <thead>
+              <div className="overflow-x-auto rounded-[var(--radius-control)] border border-[var(--border-default)]">
+                <table className="min-w-[780px] divide-y divide-[var(--border-default)] text-left text-[11px]">
+                  <thead className="bg-[var(--surface-muted)] text-[10px]">
                     <tr className="text-[var(--foreground-secondary)]">
-                      <th className="px-3 py-3 font-medium">用户</th>
-                      <th className="px-3 py-3 font-medium">邮箱</th>
-                      <th className="px-3 py-3 font-medium">角色</th>
-                      <th className="px-3 py-3 font-medium">状态</th>
-                      <th className="px-3 py-3 font-medium">操作</th>
+                      <th className="px-2 py-1.5 font-medium">用户</th>
+                      <th className="px-2 py-1.5 font-medium">显示名称</th>
+                      <th className="px-2 py-1.5 font-medium">邮箱</th>
+                      <th className="w-24 px-2 py-1.5 font-medium">角色</th>
+                      <th className="w-20 px-2 py-1.5 font-medium">状态</th>
+                      <th className="w-28 px-2 py-1.5 text-right font-medium">
+                        操作
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border-default)]">
@@ -398,46 +404,54 @@ export function UsersPage() {
                         (currentUser?.role ?? 0) > targetUser.role;
 
                       return (
-                        <tr key={targetUser.id} className="align-top">
-                          <td className="px-3 py-4">
-                            <div className="space-y-1">
-                              <p className="font-medium text-[var(--foreground-primary)]">
+                        <tr
+                          key={targetUser.id}
+                          className="h-8 hover:bg-[var(--surface-muted)]"
+                        >
+                          <td className="px-2 py-0">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span className="font-mono text-[9px] text-[var(--foreground-muted)]">
+                                #{targetUser.id}
+                              </span>
+                              <span className="truncate font-medium text-[var(--foreground-primary)]">
                                 {targetUser.username}
-                              </p>
-                              <p className="text-xs text-[var(--foreground-secondary)]">
-                                显示名称：{targetUser.display_name || '未设置'}
-                              </p>
-                              <p className="text-xs text-[var(--foreground-secondary)]">
-                                ID：{targetUser.id}
-                              </p>
+                              </span>
                             </div>
                           </td>
-                          <td className="px-3 py-4 text-[var(--foreground-secondary)]">
+                          <td className="max-w-40 truncate px-2 py-0 text-[var(--foreground-secondary)]">
+                            {targetUser.display_name || '—'}
+                          </td>
+                          <td className="max-w-56 truncate px-2 py-0 text-[var(--foreground-secondary)]">
                             {targetUser.email || '未绑定'}
                           </td>
-                          <td className="px-3 py-4">
+                          <td className="px-2 py-0">
                             <StatusBadge
                               label={roleMeta.label}
                               variant={roleMeta.variant}
                             />
                           </td>
-                          <td className="px-3 py-4">
+                          <td className="px-2 py-0">
                             <StatusBadge
                               label={statusMeta.label}
                               variant={statusMeta.variant}
                             />
                           </td>
-                          <td className="px-3 py-4">
-                            <div className="flex flex-wrap gap-2">
-                              <SecondaryButton
+                          <td className="px-2 py-0">
+                            <div className="flex justify-end gap-1">
+                              <button
                                 type="button"
                                 onClick={() => handleEdit(targetUser)}
-                                className="px-3 py-2 text-xs"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--foreground-secondary)] hover:bg-[var(--control-background-hover)] hover:text-[var(--foreground-primary)] disabled:opacity-35"
                                 disabled={!canManage}
+                                title="编辑用户"
+                                aria-label={`编辑 ${targetUser.username}`}
                               >
-                                编辑
-                              </SecondaryButton>
-                              <SecondaryButton
+                                <Pencil
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
+                              </button>
+                              <button
                                 type="button"
                                 onClick={() =>
                                   handleManage(
@@ -447,14 +461,30 @@ export function UsersPage() {
                                       : 'enable',
                                   )
                                 }
-                                className="px-3 py-2 text-xs"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--foreground-secondary)] hover:bg-[var(--control-background-hover)] hover:text-[var(--foreground-primary)] disabled:opacity-35"
                                 disabled={
                                   !canManage || manageMutation.isPending
                                 }
+                                title={
+                                  targetUser.status === 1
+                                    ? '禁用用户'
+                                    : '启用用户'
+                                }
+                                aria-label={`${targetUser.status === 1 ? '禁用' : '启用'} ${targetUser.username}`}
                               >
-                                {targetUser.status === 1 ? '禁用' : '启用'}
-                              </SecondaryButton>
-                              <SecondaryButton
+                                {targetUser.status === 1 ? (
+                                  <PowerOff
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <Power
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                              </button>
+                              <button
                                 type="button"
                                 onClick={() =>
                                   handleManage(
@@ -464,27 +494,48 @@ export function UsersPage() {
                                       : 'promote',
                                   )
                                 }
-                                className="px-3 py-2 text-xs"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--foreground-secondary)] hover:bg-[var(--control-background-hover)] hover:text-[var(--foreground-primary)] disabled:opacity-35"
                                 disabled={
                                   !canManage ||
                                   manageMutation.isPending ||
                                   (!isRoot && targetUser.role < 10)
                                 }
+                                title={
+                                  targetUser.role >= 10
+                                    ? '降低权限'
+                                    : '提升权限'
+                                }
+                                aria-label={`${targetUser.role >= 10 ? '降低' : '提升'} ${targetUser.username} 的权限`}
                               >
-                                {targetUser.role >= 10 ? '降级' : '提升'}
-                              </SecondaryButton>
-                              <DangerButton
+                                {targetUser.role >= 10 ? (
+                                  <ShieldMinus
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <ShieldPlus
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                              </button>
+                              <button
                                 type="button"
                                 onClick={() =>
                                   handleManage(targetUser, 'delete')
                                 }
-                                className="px-3 py-2 text-xs"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-[var(--status-danger-foreground)] hover:bg-[var(--status-danger-soft)] disabled:opacity-35"
                                 disabled={
                                   !canManage || manageMutation.isPending
                                 }
+                                title="删除用户"
+                                aria-label={`删除 ${targetUser.username}`}
                               >
-                                删除
-                              </DangerButton>
+                                <Trash2
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -539,7 +590,7 @@ export function UsersPage() {
         ) : (
           <form
             id="user-editor-form"
-            className="space-y-5"
+            className="space-y-3"
             onSubmit={handleSubmit}
           >
             <ResourceField
@@ -579,17 +630,17 @@ export function UsersPage() {
             </ResourceField>
 
             {editingUserId && editingUserQuery.data ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+              <div className="grid gap-2.5 md:grid-cols-2">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     绑定邮箱
                   </p>
                   <p className="mt-2 text-sm break-all text-[var(--foreground-primary)]">
                     {editingUserQuery.data.email || '未绑定'}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-4">
-                  <p className="text-xs tracking-[0.2em] text-[var(--foreground-muted)] uppercase">
+                <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+                  <p className="text-xs tracking-normal text-[var(--foreground-muted)] uppercase">
                     第三方账号
                   </p>
                   <p className="mt-2 text-sm text-[var(--foreground-primary)]">

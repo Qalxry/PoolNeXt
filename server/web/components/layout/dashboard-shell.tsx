@@ -9,11 +9,13 @@ interface DashboardShellProps {
 
 export function DashboardShell({ children }: DashboardShellProps) {
   return (
-    <div className="flex min-h-screen bg-transparent text-[var(--foreground-primary)]">
+    <div className="flex min-h-screen bg-[var(--surface-canvas)] text-[var(--foreground-primary)]">
       <DashboardSidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <DashboardTopbar />
-        <main className="flex-1 px-3 py-4 md:px-5 md:py-5">{children}</main>
+        <main className="min-w-0 flex-1 px-3 py-3 md:px-4 md:py-4">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -72,7 +72,7 @@ export function PasswordResetRequestForm() {
         title="密码重置"
         description="提交后，系统会向你的注册邮箱发送重置链接。"
       >
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-2.5" onSubmit={handleSubmit}>
           <AuthFormField label="邮箱地址">
             <AuthInput
               type="email"

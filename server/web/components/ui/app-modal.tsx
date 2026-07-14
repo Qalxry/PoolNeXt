@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
+import { X } from 'lucide-react';
 
 import { cn } from '@/lib/utils/cn';
 
@@ -56,7 +57,7 @@ export function AppModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-3 py-4"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -69,17 +70,17 @@ export function AppModal({
       />
       <div
         className={cn(
-          'relative flex max-h-[calc(100vh-3rem)] w-full flex-col overflow-hidden rounded-[28px] border border-[var(--border-default)] bg-[var(--surface-panel)] shadow-2xl',
+          'relative flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-strong)] bg-[var(--surface-panel)] shadow-[var(--shadow-lg)]',
           sizeClassNameMap[size],
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-default)] px-6 py-5">
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold text-[var(--foreground-primary)]">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--border-default)] bg-[var(--surface-base)] px-4 py-3">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--foreground-primary)]">
               {title}
             </h2>
             {description ? (
-              <p className="max-w-2xl text-sm leading-6 text-[var(--foreground-secondary)]">
+              <p className="mt-0.5 max-w-2xl text-xs leading-4 text-[var(--foreground-secondary)]">
                 {description}
               </p>
             ) : null}
@@ -87,17 +88,15 @@ export function AppModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border-default)] bg-[var(--control-background)] text-lg text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--control-background)] text-[var(--foreground-primary)] transition hover:bg-[var(--control-background-hover)]"
             aria-label="关闭弹窗"
           >
-            ×
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-          {children}
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
         {footer ? (
-          <div className="border-t border-[var(--border-default)] px-6 py-5">
+          <div className="border-t border-[var(--border-default)] bg-[var(--surface-base)] px-4 py-3">
             {footer}
           </div>
         ) : null}
