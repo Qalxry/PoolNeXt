@@ -538,7 +538,7 @@ jobs:
             fi
             sleep 2
           done
-          echo "PoolNeXt container did not become healthy" >&2
+          echo "PoolNeXt container did not become healthy after ${attempt} attempts" >&2
           exit 1
 
       - name: Collect logs and clean up
