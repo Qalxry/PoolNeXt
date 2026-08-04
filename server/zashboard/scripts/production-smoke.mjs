@@ -242,7 +242,7 @@ async function smokeProfile(context, baseURL, profileName) {
 
   const affectedRoutes = [
     ['/nodes', '节点池'],
-    ['/workspace', '工作台'],
+    ['/workspace', '编排'],
     ['/runtime', '内核'],
     ['/log', '事件日志'],
     ['/setting', '设置'],

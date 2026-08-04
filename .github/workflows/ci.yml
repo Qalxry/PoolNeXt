@@ -474,6 +474,7 @@ jobs:
           docker build \
             --build-arg "VERSION=$BUILD_VERSION" \
             --build-arg "COMMIT=$BUILD_COMMIT" \
+            --build-arg "WEB_BUILD_DIR=${{ github.workspace }}/server/web" \
             --target frontend-assets \
             --output type=local,dest=/tmp/docker-assets \
             server
@@ -484,6 +485,7 @@ jobs:
           docker build \
             --build-arg "VERSION=$BUILD_VERSION" \
             --build-arg "COMMIT=$BUILD_COMMIT" \
+            --build-arg "WEB_BUILD_DIR=${{ github.workspace }}/server/web" \
             --tag "poolnext-ci:$GITHUB_SHA" \
             server
           test "$(docker image inspect --format '{{.Config.User}}' "poolnext-ci:$GITHUB_SHA")" = "10001:10001"
