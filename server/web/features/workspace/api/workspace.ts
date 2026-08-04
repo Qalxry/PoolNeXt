@@ -7,6 +7,8 @@ import type {
   PortProfileWithNodes,
   ProxyNodeOption,
   RuntimeConfigItem,
+  RoutingRuleItem,
+  RoutingRulePayload,
 } from '@/features/workspace/types';
 
 export function getPortProfiles() {
@@ -82,5 +84,16 @@ export function savePortProfileTemplate(
 export function deletePortProfileTemplate(id: number) {
   return apiRequest<void>(`/port-profile-templates/${id}/delete`, {
     method: 'POST',
+  });
+}
+
+export function getRoutingRules() {
+  return apiRequest<RoutingRuleItem[]>('/routing-rules');
+}
+
+export function replaceRoutingRules(items: RoutingRulePayload[]) {
+  return apiRequest<RoutingRuleItem[]>('/routing-rules', {
+    method: 'POST',
+    body: JSON.stringify({ items }),
   });
 }

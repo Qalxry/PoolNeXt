@@ -19,7 +19,9 @@ import { PageHeader } from '@/components/layout/page-header';
 import { AppCard } from '@/components/ui/app-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { getKernelCapability } from '@/features/capability/api/capability';
+import { ConnectionLedger } from '@/features/runtime/components/connection-ledger';
 import {
+  getRuntimeConnections,
   getRuntimeLogs,
   getRuntimeStatus,
   reloadRuntime,
@@ -126,6 +128,11 @@ export function RuntimePage() {
   const logsQuery = useQuery({
     queryKey: ['runtime', 'logs', 0],
     queryFn: () => getRuntimeLogs(0, 100),
+  });
+  const connectionsQuery = useQuery({
+    queryKey: ['runtime', 'connections'],
+    queryFn: getRuntimeConnections,
+    refetchInterval: autoRefresh ? 2000 : false,
   });
 
   useEffect(() => {
@@ -289,6 +296,17 @@ export function RuntimePage() {
           message={capability.message}
         />
       ) : null}
+      {!status.config_valid ? (
+        <InlineMessage
+          tone="danger"
+          message={`当前编排配置无效：${status.config_error || '请检查策略组和分流规则。'}`}
+        />
+      ) : status.config_pending ? (
+        <InlineMessage
+          tone="info"
+          message="编排配置有未应用改动，请在编排页执行“应用并重载”。"
+        />
+      ) : null}
 
       <div className="metric-strip grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
         <RuntimeMetric
@@ -401,7 +419,9 @@ export function RuntimePage() {
                       {listener.profile_name}
                     </td>
                     <td className="h-8 px-2 py-0 text-[var(--foreground-secondary)]">
-                      {listener.proxy_group_name}
+                      {listener.entry_mode === 'rule'
+                        ? '规则分流'
+                        : listener.proxy_group_name}
                     </td>
                   </tr>
                 ))}
@@ -442,53 +462,65 @@ export function RuntimePage() {
         </div>
       </AppCard>
 
-      <AppCard
-        title="运行日志"
-        description={`${logs.length} 条${lastSeq > 0 ? ` · 最新 #${lastSeq}` : ''}`}
-      >
-        {logsQuery.isLoading ? <LoadingState /> : null}
-        {logs.length === 0 ? (
-          <EmptyState
-            title="暂无运行日志"
-            description="启动 Mihomo 后，这里会持续展示 stdout 和 stderr 输出。"
-          />
-        ) : (
-          <div className="max-h-[420px] overflow-auto rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)]">
-            {logs
-              .slice()
-              .reverse()
-              .map((item) => {
-                const level = runtimeLogLevelMeta(item.level);
-                return (
-                  <div
-                    key={item.seq}
-                    className="grid h-8 min-w-[760px] grid-cols-[10rem_7rem_minmax(0,1fr)] items-center gap-2 border-b border-[var(--border-default)] px-2 last:border-b-0 hover:bg-[var(--surface-muted)]"
-                  >
-                    <time className="truncate font-mono text-[10px] text-[var(--foreground-muted)]">
-                      {formatDateTime(item.created_at)}
-                    </time>
-                    <div className="flex items-center gap-1">
-                      <StatusBadge
-                        label={level.label}
-                        variant={level.variant}
-                        className="w-fit"
-                      />
-                      <span className="text-[10px] text-[var(--foreground-muted)] uppercase">
-                        {item.stream}
-                      </span>
-                    </div>
-                    <p
-                      className="min-w-0 truncate font-mono text-[10px] text-[var(--foreground-primary)]"
-                      title={item.message}
+      <ConnectionLedger
+        snapshot={connectionsQuery.data}
+        running={status.running}
+      />
+
+      <details className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-default)] bg-[var(--surface-panel)] shadow-[var(--shadow-soft)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between border-b border-[var(--border-default)] bg-[var(--surface-base)] px-3 py-2">
+          <span className="text-[13px] font-semibold text-[var(--foreground-primary)]">
+            原始内核输出
+          </span>
+          <span className="text-[10px] text-[var(--foreground-muted)]">
+            {logs.length} 条{lastSeq > 0 ? ` · 最新 #${lastSeq}` : ''}
+          </span>
+        </summary>
+        <div className="p-3">
+          {logsQuery.isLoading ? <LoadingState /> : null}
+          {logs.length === 0 ? (
+            <EmptyState
+              title="暂无运行日志"
+              description="启动 Mihomo 后，这里会持续展示 stdout 和 stderr 输出。"
+            />
+          ) : (
+            <div className="max-h-[420px] overflow-auto rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)]">
+              {logs
+                .slice()
+                .reverse()
+                .map((item) => {
+                  const level = runtimeLogLevelMeta(item.level);
+                  return (
+                    <div
+                      key={item.seq}
+                      className="grid h-8 min-w-[760px] grid-cols-[10rem_7rem_minmax(0,1fr)] items-center gap-2 border-b border-[var(--border-default)] px-2 last:border-b-0 hover:bg-[var(--surface-muted)]"
                     >
-                      {item.message}
-                    </p>
-                  </div>
-                );
-              })}
-          </div>
-        )}
-      </AppCard>
+                      <time className="truncate font-mono text-[10px] text-[var(--foreground-muted)]">
+                        {formatDateTime(item.created_at)}
+                      </time>
+                      <div className="flex items-center gap-1">
+                        <StatusBadge
+                          label={level.label}
+                          variant={level.variant}
+                          className="w-fit"
+                        />
+                        <span className="text-[10px] text-[var(--foreground-muted)] uppercase">
+                          {item.stream}
+                        </span>
+                      </div>
+                      <p
+                        className="min-w-0 truncate font-mono text-[10px] text-[var(--foreground-primary)]"
+                        title={item.message}
+                      >
+                        {item.message}
+                      </p>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

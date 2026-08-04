@@ -29,6 +29,8 @@ const runtimeStatus = {
   profile_count: 1,
   listener_count: 1,
   listeners: [],
+  config_pending: false,
+  config_valid: true,
   rendered_config_preview: [
     'secret: controller-secret-value',
     'proxies:',
@@ -62,6 +64,17 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('@/features/runtime/api/runtime', () => ({
+  getRuntimeConnections: vi.fn().mockResolvedValue({
+    available: true,
+    collected_at: '2026-07-14T00:00:00Z',
+    upload_rate: 0,
+    download_rate: 0,
+    upload_total: 0,
+    download_total: 0,
+    memory: 0,
+    active_count: 0,
+    items: [],
+  }),
   getRuntimeLogs: vi.fn().mockResolvedValue({ items: [] }),
   getRuntimeStatus: vi.fn(),
   reloadRuntime: vi.fn(),

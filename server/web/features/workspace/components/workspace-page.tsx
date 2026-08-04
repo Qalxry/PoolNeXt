@@ -22,6 +22,11 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import { getKernelCapability } from '@/features/capability/api/capability';
 import {
+  getRuntimeStatus,
+  reloadRuntime,
+} from '@/features/runtime/api/runtime';
+import { RoutingRulesPanel } from '@/features/workspace/components/routing-rules-panel';
+import {
   createPortProfile,
   deletePortProfileTemplate,
   deletePortProfile,
@@ -62,8 +67,13 @@ const defaultHTTPPort = 7892;
 
 const defaultProxySettings: PortProfileProxySettings = {
   strategy_type: 'fallback',
+  entry_mode: 'fixed',
   test_url: 'https://cp.cloudflare.com/generate_204',
   test_interval_seconds: 300,
+  test_timeout_milliseconds: 5000,
+  max_failed_times: 5,
+  expected_status: '204',
+  url_test_tolerance_milliseconds: 150,
   load_balance_strategy: 'consistent-hashing',
   load_balance_lazy: false,
   load_balance_disable_udp: false,
@@ -112,8 +122,14 @@ function normalizeProxySettings(
 ): PortProfileProxySettings {
   return {
     strategy_type: value?.strategy_type ?? 'fallback',
+    entry_mode: value?.entry_mode ?? 'fixed',
     test_url: value?.test_url ?? 'https://cp.cloudflare.com/generate_204',
     test_interval_seconds: value?.test_interval_seconds ?? 300,
+    test_timeout_milliseconds: value?.test_timeout_milliseconds ?? 5000,
+    max_failed_times: value?.max_failed_times ?? 5,
+    expected_status: value?.expected_status ?? '204',
+    url_test_tolerance_milliseconds:
+      value?.url_test_tolerance_milliseconds ?? 150,
     load_balance_strategy: value?.load_balance_strategy ?? 'consistent-hashing',
     load_balance_lazy: value?.load_balance_lazy ?? false,
     load_balance_disable_udp: value?.load_balance_disable_udp ?? false,
@@ -173,6 +189,11 @@ export function WorkspacePage() {
   const profilesQuery = useQuery({
     queryKey: workspaceListQueryKey,
     queryFn: getPortProfiles,
+  });
+  const runtimeStatusQuery = useQuery({
+    queryKey: ['runtime', 'status'],
+    queryFn: getRuntimeStatus,
+    refetchInterval: 5000,
   });
   const templatesQuery = useQuery({
     queryKey: ['workspace', 'templates'],
@@ -238,6 +259,7 @@ export function WorkspacePage() {
       setIsCreating(false);
       setSelectedProfileId(result.profile.id);
       await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey });
+      await queryClient.invalidateQueries({ queryKey: ['runtime', 'status'] });
     },
     onError: (error) => {
       setFeedback({ tone: 'danger', message: getErrorMessage(error) });
@@ -252,6 +274,7 @@ export function WorkspacePage() {
       await queryClient.invalidateQueries({
         queryKey: ['workspace', 'profile', selectedProfileId],
       });
+      await queryClient.invalidateQueries({ queryKey: ['runtime', 'status'] });
     },
     onError: (error) => {
       setFeedback({ tone: 'danger', message: getErrorMessage(error) });
@@ -286,13 +309,25 @@ export function WorkspacePage() {
       }),
     onSuccess: async (_, variables) => {
       const message = variables.checked
-        ? '端口配置已加入最终配置。'
-        : '端口配置已移出最终配置。';
+        ? '策略组已设为随运行加载。'
+        : '策略组已设为不随运行加载。';
       setFeedback({ tone: 'success', message });
       await queryClient.invalidateQueries({ queryKey: workspaceListQueryKey });
       await queryClient.invalidateQueries({
         queryKey: ['workspace', 'profile', variables.item.profile.id],
       });
+      await queryClient.invalidateQueries({ queryKey: ['runtime', 'status'] });
+    },
+    onError: (error) => {
+      setFeedback({ tone: 'danger', message: getErrorMessage(error) });
+    },
+  });
+
+  const reloadMutation = useMutation({
+    mutationFn: reloadRuntime,
+    onSuccess: async () => {
+      setFeedback({ tone: 'success', message: '配置已应用并完成热重载。' });
+      await queryClient.invalidateQueries({ queryKey: ['runtime', 'status'] });
     },
     onError: (error) => {
       setFeedback({ tone: 'danger', message: getErrorMessage(error) });
@@ -457,10 +492,29 @@ export function WorkspacePage() {
       <PageHeader
         title="编排"
         action={
-          <SecondaryButton type="button" onClick={handleCreateNew}>
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            新建配置
-          </SecondaryButton>
+          <div className="flex gap-1.5">
+            {runtimeStatusQuery.data?.running ? (
+              <PrimaryButton
+                type="button"
+                onClick={() => reloadMutation.mutate()}
+                disabled={
+                  reloadMutation.isPending ||
+                  !runtimeStatusQuery.data.config_pending
+                }
+              >
+                <Save className="h-3.5 w-3.5" aria-hidden="true" />
+                {reloadMutation.isPending
+                  ? '应用中...'
+                  : runtimeStatusQuery.data.config_pending
+                    ? '应用并重载'
+                    : '配置已应用'}
+              </PrimaryButton>
+            ) : null}
+            <SecondaryButton type="button" onClick={handleCreateNew}>
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              新建配置
+            </SecondaryButton>
+          </div>
         }
       />
 
@@ -469,6 +523,18 @@ export function WorkspacePage() {
       ) : null}
       {capability ? (
         <InlineMessage tone="info" message={capability.message} />
+      ) : null}
+      {runtimeStatusQuery.data?.config_pending ? (
+        <InlineMessage
+          tone="info"
+          message="编排配置已修改但尚未应用到正在运行的 Mihomo。"
+        />
+      ) : null}
+      {runtimeStatusQuery.data && !runtimeStatusQuery.data.config_valid ? (
+        <InlineMessage
+          tone="danger"
+          message={`当前编排无法生成有效运行配置：${runtimeStatusQuery.data.config_error || '请检查策略组和分流规则。'}`}
+        />
       ) : null}
 
       <div className="grid gap-3 xl:grid-cols-[240px_minmax(0,1fr)]">
@@ -500,7 +566,7 @@ export function WorkspacePage() {
                     setFeedback(null);
                   }}
                   title={`更新于 ${formatDateTime(item.profile.updated_at)}`}
-                  className={`flex h-10 w-full items-center gap-2 rounded-[var(--radius-control)] border px-2 text-left text-[11px] transition ${
+                  className={`flex h-11 w-full items-center gap-2 rounded-[var(--radius-control)] border px-2 text-left text-[11px] transition ${
                     selectedProfileId === item.profile.id
                       ? 'border-[var(--border-strong)] bg-[var(--accent-soft)]'
                       : 'border-[var(--border-default)] bg-[var(--surface-base)] hover:bg-[var(--control-background-hover)]'
@@ -518,6 +584,15 @@ export function WorkspacePage() {
                       · {item.profile.proxy_settings.strategy_type} ·{' '}
                       {item.node_ids.length} 节点
                     </p>
+                    <p className="truncate text-[9px] text-[var(--foreground-secondary)]">
+                      {item.profile.include_in_runtime
+                        ? '随运行加载'
+                        : '不加载'}{' '}
+                      ·{' '}
+                      {item.profile.proxy_settings.entry_mode === 'rule'
+                        ? '规则分流'
+                        : '固定本组'}
+                    </p>
                   </div>
                   <div
                     className="shrink-0"
@@ -527,6 +602,7 @@ export function WorkspacePage() {
                       id={`profile-runtime-${item.profile.id}`}
                       checked={item.profile.include_in_runtime}
                       disabled={toggleRuntimeInclusionMutation.isPending}
+                      title="随运行加载"
                       onCheckedChange={(checked) => {
                         setFeedback(null);
                         toggleRuntimeInclusionMutation.mutate({
@@ -696,6 +772,24 @@ export function WorkspacePage() {
                   placeholder="127.0.0.1"
                 />
               </ResourceField>
+              <div className="flex min-h-16 items-center justify-between gap-3 rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)] px-2.5 py-2">
+                <div>
+                  <Label htmlFor="profile-include-in-runtime">随运行加载</Label>
+                  <p className="mt-0.5 text-[11px] leading-4 text-[var(--foreground-secondary)]">
+                    启用后，该策略组和监听入口会进入最终 Mihomo 配置。
+                  </p>
+                </div>
+                <Switch
+                  id="profile-include-in-runtime"
+                  checked={payload.include_in_runtime}
+                  onCheckedChange={(checked) =>
+                    setPayload((current) => ({
+                      ...current,
+                      include_in_runtime: checked,
+                    }))
+                  }
+                />
+              </div>
               <div className="rounded-[var(--radius-control)] border border-[var(--border-default)] bg-[var(--surface-base)] p-2.5 xl:col-span-2">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
@@ -804,6 +898,26 @@ export function WorkspacePage() {
                   ))}
                 </ResourceSelect>
               </ResourceField>
+              <ResourceField
+                label="入口路由模式"
+                hint="固定本组保持现有行为；规则分流会交给下方有序规则决定出口。"
+              >
+                <ResourceSelect
+                  value={payload.proxy_settings.entry_mode}
+                  onChange={(event) =>
+                    setPayload((current) => ({
+                      ...current,
+                      proxy_settings: {
+                        ...current.proxy_settings,
+                        entry_mode: event.target.value as 'fixed' | 'rule',
+                      },
+                    }))
+                  }
+                >
+                  <option value="fixed">固定到本策略组</option>
+                  <option value="rule">参与规则分流</option>
+                </ResourceSelect>
+              </ResourceField>
               <ResourceField label="测试 URL">
                 <ResourceInput
                   value={payload.proxy_settings.test_url}
@@ -818,6 +932,77 @@ export function WorkspacePage() {
                   }
                 />
               </ResourceField>
+              <ResourceField label="探测超时（毫秒）">
+                <ResourceInput
+                  value={String(
+                    payload.proxy_settings.test_timeout_milliseconds,
+                  )}
+                  onChange={(event) =>
+                    setPayload((current) => ({
+                      ...current,
+                      proxy_settings: {
+                        ...current.proxy_settings,
+                        test_timeout_milliseconds:
+                          Number.parseInt(event.target.value, 10) || 0,
+                      },
+                    }))
+                  }
+                  inputMode="numeric"
+                />
+              </ResourceField>
+              <ResourceField label="最大连续失败次数">
+                <ResourceInput
+                  value={String(payload.proxy_settings.max_failed_times)}
+                  onChange={(event) =>
+                    setPayload((current) => ({
+                      ...current,
+                      proxy_settings: {
+                        ...current.proxy_settings,
+                        max_failed_times:
+                          Number.parseInt(event.target.value, 10) || 0,
+                      },
+                    }))
+                  }
+                  inputMode="numeric"
+                />
+              </ResourceField>
+              <ResourceField
+                label="期望状态码"
+                hint="支持 204、200/204 或 200-299。"
+              >
+                <ResourceInput
+                  value={payload.proxy_settings.expected_status}
+                  onChange={(event) =>
+                    setPayload((current) => ({
+                      ...current,
+                      proxy_settings: {
+                        ...current.proxy_settings,
+                        expected_status: event.target.value,
+                      },
+                    }))
+                  }
+                />
+              </ResourceField>
+              {payload.proxy_settings.strategy_type === 'url-test' ? (
+                <ResourceField label="切换容差（毫秒）">
+                  <ResourceInput
+                    value={String(
+                      payload.proxy_settings.url_test_tolerance_milliseconds,
+                    )}
+                    onChange={(event) =>
+                      setPayload((current) => ({
+                        ...current,
+                        proxy_settings: {
+                          ...current.proxy_settings,
+                          url_test_tolerance_milliseconds:
+                            Number.parseInt(event.target.value, 10) || 0,
+                        },
+                      }))
+                    }
+                    inputMode="numeric"
+                  />
+                </ResourceField>
+              ) : null}
               <ResourceField label="测试间隔（秒）">
                 <ResourceInput
                   value={String(payload.proxy_settings.test_interval_seconds)}
@@ -857,6 +1042,7 @@ export function WorkspacePage() {
                         consistent-hashing
                       </option>
                       <option value="round-robin">round-robin</option>
+                      <option value="sticky-sessions">sticky-sessions</option>
                     </ResourceSelect>
                   </ResourceField>
                   <div className="grid gap-3 lg:grid-cols-2">
@@ -1014,6 +1200,8 @@ export function WorkspacePage() {
               </details>
             </div>
           </AppCard>
+
+          <RoutingRulesPanel profiles={profileList} />
 
           <AppCard title="节点选择器">
             <div className="space-y-2">

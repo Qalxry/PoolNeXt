@@ -4,12 +4,22 @@ export type PortProfileStrategy =
   | 'fallback'
   | 'load-balance';
 
-export type LoadBalanceStrategy = 'consistent-hashing' | 'round-robin';
+export type LoadBalanceStrategy =
+  | 'consistent-hashing'
+  | 'round-robin'
+  | 'sticky-sessions';
+
+export type PortProfileEntryMode = 'fixed' | 'rule';
 
 export interface PortProfileProxySettings {
   strategy_type: PortProfileStrategy;
+  entry_mode: PortProfileEntryMode;
   test_url: string;
   test_interval_seconds: number;
+  test_timeout_milliseconds: number;
+  max_failed_times: number;
+  expected_status: string;
+  url_test_tolerance_milliseconds: number;
   load_balance_strategy: LoadBalanceStrategy;
   load_balance_lazy: boolean;
   load_balance_disable_udp: boolean;
@@ -104,3 +114,31 @@ export interface PortProfileTemplateItem {
   template: PortProfileTemplateRecord;
   node_ids: number[];
 }
+
+export type RoutingRuleType =
+  | 'DOMAIN'
+  | 'DOMAIN-SUFFIX'
+  | 'DOMAIN-KEYWORD'
+  | 'IP-CIDR'
+  | 'SRC-IP-CIDR'
+  | 'DST-PORT'
+  | 'NETWORK'
+  | 'IN-NAME'
+  | 'MATCH';
+
+export interface RoutingRuleItem {
+  id: number;
+  name: string;
+  rule_type: RoutingRuleType;
+  payload: string;
+  target_profile_id: number;
+  enabled: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type RoutingRulePayload = Pick<
+  RoutingRuleItem,
+  'id' | 'name' | 'rule_type' | 'payload' | 'target_profile_id' | 'enabled'
+>;
