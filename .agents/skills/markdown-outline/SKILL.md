@@ -26,7 +26,7 @@ python <skill-root>/scripts/get_markdown_outline.py "<target-file>.md"
 # Optional: add `--max-level N` to limit heading depth (default 6)
 # Optional: add `-o <output-file>` to write the outline to a file instead of stdout
 # Example: python ./.agent/skills/markdown-outline/scripts/get_markdown_outline.py "long-document.md" --max-level 3
-# Example: python ./.agent/skills/markdown-outline/scripts/get_markdown_outline.py "long-document.md" --max-level 3 -o "long-document.index.md" 
+# Example: python ./.agent/skills/markdown-outline/scripts/get_markdown_outline.py "long-document.md" --max-level 3 -o "long-document.index.md"
 ```
 
 - Use `--max-level N` (1–6) to limit heading depth if the file is deeply nested. Default is 6.
