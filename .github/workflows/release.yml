@@ -37,11 +37,11 @@ jobs:
         run: |
           set -euo pipefail
           pointed_tag="$(git tag --points-at HEAD --list 'v*' | sort -V | tail -n1)"
-          input_version="${INPUT_VERSION//[[:space:]]/}"
+          version_input="${INPUT_VERSION//[[:space:]]/}"
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             version="$GITHUB_REF_NAME"
-          elif [[ -n "$input_version" ]]; then
-            version="$input_version"
+          elif [[ -n "$version_input" ]]; then
+            version="$version_input"
           elif [[ -n "$pointed_tag" ]]; then
             version="$pointed_tag"
           else
@@ -71,10 +71,12 @@ jobs:
             if [[ "$version" == "$latest_stable" ]]; then publish_latest=true; fi
           fi
 
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "commit=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
-          echo "is_prerelease=$is_prerelease" >> "$GITHUB_OUTPUT"
-          echo "publish_latest=$publish_latest" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$version"
+            echo "commit=${GITHUB_SHA::12}"
+            echo "is_prerelease=$is_prerelease"
+            echo "publish_latest=$publish_latest"
+          } >> "$GITHUB_OUTPUT"
 
   quality:
     name: Required quality gate
