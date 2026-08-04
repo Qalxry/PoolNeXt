@@ -30,6 +30,7 @@ COPY ./zashboard ./
 RUN ZASHBOARD_COMMIT_ID="$COMMIT" pnpm build:embedded
 
 FROM scratch AS frontend-assets
+ARG WEB_BUILD_DIR
 COPY --from=web-builder ${WEB_BUILD_DIR}/build /web/build
 COPY --from=zashboard-builder /build/dist /zashboard/dist
 
