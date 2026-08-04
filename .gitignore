@@ -53,3 +53,8 @@ go.work.sum
 # Python-generated caches
 __pycache__/
 *.py[cod]
+
+# Local runtime artifacts and reference clones (not versioned)
+/data/
+/dist/
+/ref_repos/
