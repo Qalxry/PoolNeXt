@@ -117,6 +117,12 @@ func SetApiRouter(router *gin.Engine) {
 			portProfileRoute.POST("/:id/runtime/save", controller.SaveRuntimeConfig)
 			portProfileRoute.POST("/:id/delete", controller.DeletePortProfile)
 		}
+		routingRuleRoute := apiRouter.Group("/routing-rules")
+		routingRuleRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
+		{
+			routingRuleRoute.GET("", controller.GetRoutingRules)
+			routingRuleRoute.POST("", controller.ReplaceRoutingRules)
+		}
 		templateRoute := apiRouter.Group("/port-profile-templates")
 		templateRoute.Use(middleware.AdminAuth(), middleware.NoTokenAuth())
 		{
@@ -129,6 +135,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			runtimeRoute.GET("/status", controller.GetRuntimeStatus)
 			runtimeRoute.GET("/logs", controller.GetRuntimeLogs)
+			runtimeRoute.GET("/connections", controller.GetRuntimeConnections)
 			runtimeRoute.POST("/start", controller.StartRuntime)
 			runtimeRoute.POST("/stop", controller.StopRuntime)
 			runtimeRoute.POST("/reload", controller.ReloadRuntime)

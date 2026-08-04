@@ -49,6 +49,12 @@ func RenderMihomoConfig(input MihomoRenderInput) (*RenderResult, error) {
 	if groupName == "" {
 		groupName = "PoolNeXt"
 	}
+	listeners := buildListeners(input.Profile, proxySettings)
+	if normalizeEntryMode(proxySettings.EntryMode) == model.PortProfileEntryModeFixed {
+		for _, listener := range listeners {
+			listener["proxy"] = groupName
+		}
+	}
 
 	fragment := map[string]any{
 		"fragment_kind": "port-profile",
@@ -59,15 +65,20 @@ func RenderMihomoConfig(input MihomoRenderInput) (*RenderResult, error) {
 			"kernel":             fallbackString(strings.TrimSpace(input.Profile.KernelType), "mihomo"),
 			"listen_host":        fallbackString(strings.TrimSpace(input.Profile.ListenHost), "127.0.0.1"),
 		},
-		"listeners": buildListeners(input.Profile, proxySettings),
+		"listeners": listeners,
 		"strategy": map[string]any{
-			"group_name":               groupName,
-			"type":                     normalizeStrategyType(proxySettings.StrategyType),
-			"test_url":                 fallbackString(strings.TrimSpace(proxySettings.TestURL), "https://cp.cloudflare.com/generate_204"),
-			"test_interval":            normalizePositive(proxySettings.TestIntervalSeconds, 300),
-			"load_balance_mode":        normalizeLoadBalanceStrategy(proxySettings.LoadBalanceStrategy),
-			"load_balance_lazy":        proxySettings.LoadBalanceLazy,
-			"load_balance_disable_udp": proxySettings.LoadBalanceDisableUDP,
+			"group_name":                groupName,
+			"type":                      normalizeStrategyType(proxySettings.StrategyType),
+			"entry_mode":                normalizeEntryMode(proxySettings.EntryMode),
+			"test_url":                  fallbackString(strings.TrimSpace(proxySettings.TestURL), "https://cp.cloudflare.com/generate_204"),
+			"test_interval":             normalizePositive(proxySettings.TestIntervalSeconds, 300),
+			"test_timeout_milliseconds": normalizePositive(proxySettings.TestTimeoutMilliseconds, 5000),
+			"max_failed_times":          normalizePositive(proxySettings.MaxFailedTimes, 5),
+			"expected_status":           fallbackString(strings.TrimSpace(proxySettings.ExpectedStatus), "204"),
+			"url_test_tolerance":        proxySettings.URLTestToleranceMilliseconds,
+			"load_balance_mode":         normalizeLoadBalanceStrategy(proxySettings.LoadBalanceStrategy),
+			"load_balance_lazy":         proxySettings.LoadBalanceLazy,
+			"load_balance_disable_udp":  proxySettings.LoadBalanceDisableUDP,
 		},
 		"proxies": proxies,
 		"proxy-groups": []map[string]any{
@@ -151,15 +162,22 @@ func buildStrategyGroup(profile model.PortProfile, proxySettings model.PortProfi
 	case model.PortProfileStrategyURLTest, model.PortProfileStrategyFallback, model.PortProfileStrategyLoadBalance:
 		result["url"] = fallbackString(strings.TrimSpace(proxySettings.TestURL), "https://cp.cloudflare.com/generate_204")
 		result["interval"] = normalizePositive(proxySettings.TestIntervalSeconds, 300)
+		result["timeout"] = normalizePositive(proxySettings.TestTimeoutMilliseconds, 5000)
+		result["max-failed-times"] = normalizePositive(proxySettings.MaxFailedTimes, 5)
+		result["expected-status"] = fallbackString(strings.TrimSpace(proxySettings.ExpectedStatus), "204")
+		if proxySettings.LoadBalanceLazy {
+			result["lazy"] = true
+		}
 	default:
 		result["type"] = model.PortProfileStrategySelect
 	}
 
+	if proxySettings.StrategyType == model.PortProfileStrategyURLTest && proxySettings.URLTestToleranceMilliseconds > 0 {
+		result["tolerance"] = proxySettings.URLTestToleranceMilliseconds
+	}
+
 	if proxySettings.StrategyType == model.PortProfileStrategyLoadBalance {
 		result["strategy"] = normalizeLoadBalanceStrategy(proxySettings.LoadBalanceStrategy)
-		if proxySettings.LoadBalanceLazy {
-			result["lazy"] = true
-		}
 		if proxySettings.LoadBalanceDisableUDP {
 			result["disable-udp"] = true
 		}
@@ -170,11 +188,18 @@ func buildStrategyGroup(profile model.PortProfile, proxySettings model.PortProfi
 
 func normalizeLoadBalanceStrategy(value string) string {
 	switch strings.TrimSpace(value) {
-	case "round-robin":
-		return "round-robin"
+	case "round-robin", "sticky-sessions":
+		return strings.TrimSpace(value)
 	default:
 		return "consistent-hashing"
 	}
+}
+
+func normalizeEntryMode(value string) string {
+	if strings.TrimSpace(value) == model.PortProfileEntryModeRule {
+		return model.PortProfileEntryModeRule
+	}
+	return model.PortProfileEntryModeFixed
 }
 
 func normalizeStrategyType(value string) string {

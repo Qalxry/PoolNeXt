@@ -7,6 +7,7 @@ import (
 	"poolx/internal/pkg/common"
 	"poolx/internal/pkg/runtimeconfig"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gorm.io/gorm"
@@ -104,6 +105,15 @@ func UpdatePortProfile(id int, payload PortProfilePayload) (*model.PortProfileWi
 	if err != nil {
 		return nil, fmt.Errorf("端口配置不存在")
 	}
+	if profile.IncludeInRuntime && !normalized.IncludeInRuntime {
+		var routingReferenceCount int64
+		if err := model.DB.Model(&model.RoutingRule{}).Where("target_profile_id = ?", id).Count(&routingReferenceCount).Error; err != nil {
+			return nil, err
+		}
+		if routingReferenceCount > 0 {
+			return nil, fmt.Errorf("该策略组仍被 %d 条分流规则引用，请先调整规则再关闭随运行加载", routingReferenceCount)
+		}
+	}
 
 	profile.Name = normalized.Name
 	profile.ListenHost = normalized.ListenHost
@@ -135,6 +145,13 @@ func DeletePortProfile(id int) error {
 		return fmt.Errorf("无效的端口配置 ID")
 	}
 	return model.DB.Transaction(func(tx *gorm.DB) error {
+		var routingReferenceCount int64
+		if err := tx.Model(&model.RoutingRule{}).Where("target_profile_id = ?", id).Count(&routingReferenceCount).Error; err != nil {
+			return err
+		}
+		if routingReferenceCount > 0 {
+			return fmt.Errorf("该策略组仍被 %d 条分流规则引用，请先调整规则", routingReferenceCount)
+		}
 		if err := tx.Where("port_profile_id = ?", id).Delete(&model.PortProfileNode{}).Error; err != nil {
 			return err
 		}
@@ -289,6 +306,11 @@ func normalizePortProfilePayload(payload PortProfilePayload) (*PortProfilePayloa
 	}
 
 	proxySettings := normalizePortProfileProxySettings(payload.ProxySettings)
+	expectedStatus, err := normalizeExpectedStatus(proxySettings.ExpectedStatus)
+	if err != nil {
+		return nil, fmt.Errorf("期望状态码无效: %v", err)
+	}
+	proxySettings.ExpectedStatus = expectedStatus
 	if proxySettings.AuthEnabled && (proxySettings.AuthUsername == "" || proxySettings.AuthPassword == "") {
 		return nil, fmt.Errorf("开启鉴权后，用户名和密码不能为空")
 	}
@@ -355,8 +377,8 @@ func validatePortProfileUniqueness(payload *PortProfilePayload, currentID int) e
 
 func normalizeLoadBalanceStrategy(value string) string {
 	switch strings.TrimSpace(value) {
-	case "round-robin":
-		return "round-robin"
+	case "round-robin", "sticky-sessions":
+		return strings.TrimSpace(value)
 	default:
 		return "consistent-hashing"
 	}
@@ -462,8 +484,13 @@ func normalizePortProfileProxySettings(settings model.PortProfileProxySettings) 
 	result := model.DefaultPortProfileProxySettings()
 	if settings != (model.PortProfileProxySettings{}) {
 		result.StrategyType = settings.StrategyType
+		result.EntryMode = settings.EntryMode
 		result.TestURL = settings.TestURL
 		result.TestIntervalSeconds = settings.TestIntervalSeconds
+		result.TestTimeoutMilliseconds = settings.TestTimeoutMilliseconds
+		result.MaxFailedTimes = settings.MaxFailedTimes
+		result.ExpectedStatus = settings.ExpectedStatus
+		result.URLTestToleranceMilliseconds = settings.URLTestToleranceMilliseconds
 		result.LoadBalanceStrategy = settings.LoadBalanceStrategy
 		result.LoadBalanceLazy = settings.LoadBalanceLazy
 		result.LoadBalanceDisableUDP = settings.LoadBalanceDisableUDP
@@ -475,9 +502,31 @@ func normalizePortProfileProxySettings(settings model.PortProfileProxySettings) 
 	default:
 		result.StrategyType = model.PortProfileStrategySelect
 	}
+	switch strings.TrimSpace(result.EntryMode) {
+	case model.PortProfileEntryModeRule:
+		result.EntryMode = model.PortProfileEntryModeRule
+	default:
+		result.EntryMode = model.PortProfileEntryModeFixed
+	}
 	defaults := model.DefaultPortProfileProxySettings()
 	result.TestURL = fallbackPortProfileString(strings.TrimSpace(settings.TestURL), defaults.TestURL)
 	result.TestIntervalSeconds = normalizePortProfilePositive(settings.TestIntervalSeconds, defaults.TestIntervalSeconds)
+	result.TestTimeoutMilliseconds = normalizePortProfilePositive(settings.TestTimeoutMilliseconds, defaults.TestTimeoutMilliseconds)
+	if result.TestTimeoutMilliseconds > 60000 {
+		result.TestTimeoutMilliseconds = 60000
+	}
+	result.MaxFailedTimes = normalizePortProfilePositive(settings.MaxFailedTimes, defaults.MaxFailedTimes)
+	if result.MaxFailedTimes > 100 {
+		result.MaxFailedTimes = 100
+	}
+	result.ExpectedStatus = fallbackPortProfileString(strings.TrimSpace(settings.ExpectedStatus), defaults.ExpectedStatus)
+	result.URLTestToleranceMilliseconds = settings.URLTestToleranceMilliseconds
+	if result.URLTestToleranceMilliseconds < 0 {
+		result.URLTestToleranceMilliseconds = 0
+	}
+	if result.URLTestToleranceMilliseconds > 65535 {
+		result.URLTestToleranceMilliseconds = 65535
+	}
 	result.LoadBalanceStrategy = normalizeLoadBalanceStrategy(settings.LoadBalanceStrategy)
 	result.AuthEnabled = settings.AuthEnabled
 	result.AuthUsername = strings.TrimSpace(settings.AuthUsername)
@@ -509,4 +558,42 @@ func normalizePortProfilePositive(value int, fallback int) int {
 		return value
 	}
 	return fallback
+}
+
+func normalizeExpectedStatus(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "*" {
+		return "*", nil
+	}
+	parts := strings.FieldsFunc(value, func(r rune) bool { return r == '/' || r == ',' })
+	if len(parts) == 0 || len(parts) > 28 {
+		return "", fmt.Errorf("范围数量必须在 1 到 28 之间")
+	}
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		bounds := strings.Split(strings.TrimSpace(part), "-")
+		if len(bounds) < 1 || len(bounds) > 2 {
+			return "", fmt.Errorf("范围格式错误")
+		}
+		start, err := strconv.Atoi(strings.TrimSpace(bounds[0]))
+		if err != nil || start < 100 || start > 599 {
+			return "", fmt.Errorf("状态码必须在 100 到 599 之间")
+		}
+		end := start
+		if len(bounds) == 2 {
+			end, err = strconv.Atoi(strings.TrimSpace(bounds[1]))
+			if err != nil || end < 100 || end > 599 {
+				return "", fmt.Errorf("状态码必须在 100 到 599 之间")
+			}
+		}
+		if start > end {
+			start, end = end, start
+		}
+		if start == end {
+			result = append(result, strconv.Itoa(start))
+		} else {
+			result = append(result, fmt.Sprintf("%d-%d", start, end))
+		}
+	}
+	return strings.Join(result, "/"), nil
 }

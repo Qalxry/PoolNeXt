@@ -12,6 +12,53 @@ import (
 	"time"
 )
 
+const mihomoControllerResponseLimit = 16 << 20
+
+type MihomoConnectionMetadata struct {
+	Network           string `json:"network"`
+	Type              string `json:"type"`
+	SourceIP          string `json:"sourceIP"`
+	DestinationIP     string `json:"destinationIP"`
+	SourcePort        string `json:"sourcePort"`
+	DestinationPort   string `json:"destinationPort"`
+	InboundIP         string `json:"inboundIP"`
+	InboundPort       string `json:"inboundPort"`
+	InboundName       string `json:"inboundName"`
+	InboundUser       string `json:"inboundUser"`
+	Host              string `json:"host"`
+	Process           string `json:"process"`
+	ProcessPath       string `json:"processPath"`
+	SpecialProxy      string `json:"specialProxy"`
+	RemoteDestination string `json:"remoteDestination"`
+	SniffHost         string `json:"sniffHost"`
+}
+
+type MihomoConnection struct {
+	ID             string                   `json:"id"`
+	Metadata       MihomoConnectionMetadata `json:"metadata"`
+	Upload         int64                    `json:"upload"`
+	Download       int64                    `json:"download"`
+	Start          time.Time                `json:"start"`
+	Chains         []string                 `json:"chains"`
+	ProviderChains []string                 `json:"providerChains"`
+	Rule           string                   `json:"rule"`
+	RulePayload    string                   `json:"rulePayload"`
+}
+
+type MihomoConnectionSnapshot struct {
+	DownloadTotal int64              `json:"downloadTotal"`
+	UploadTotal   int64              `json:"uploadTotal"`
+	Connections   []MihomoConnection `json:"connections"`
+	Memory        uint64             `json:"memory"`
+}
+
+type MihomoTrafficSnapshot struct {
+	Up        int64 `json:"up"`
+	Down      int64 `json:"down"`
+	UpTotal   int64 `json:"upTotal"`
+	DownTotal int64 `json:"downTotal"`
+}
+
 var MihomoHTTPClient = &http.Client{
 	Timeout: 5 * time.Second,
 }
@@ -120,4 +167,65 @@ func GetMihomoVersion(ctx context.Context, controllerAddress string, secret stri
 		return "", err
 	}
 	return payload.Version, nil
+}
+
+func GetMihomoConnections(ctx context.Context, controllerAddress string, secret string) (*MihomoConnectionSnapshot, error) {
+	var payload MihomoConnectionSnapshot
+	if err := getMihomoControllerJSON(ctx, controllerAddress, secret, "/connections", &payload); err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
+func GetMihomoTraffic(ctx context.Context, controllerAddress string, secret string) (*MihomoTrafficSnapshot, error) {
+	var payload MihomoTrafficSnapshot
+	if err := getMihomoTrafficJSON(ctx, controllerAddress, secret, &payload); err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
+func getMihomoTrafficJSON(ctx context.Context, controllerAddress string, secret string, target any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://%s/traffic", controllerAddress), nil)
+	if err != nil {
+		return err
+	}
+	if secret != "" {
+		req.Header.Set("Authorization", "Bearer "+secret)
+	}
+	resp, err := MihomoHTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("controller status: %s", resp.Status)
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, mihomoControllerResponseLimit)).Decode(target); err != nil {
+		return fmt.Errorf("decode controller response: %w", err)
+	}
+	return nil
+}
+
+func getMihomoControllerJSON(ctx context.Context, controllerAddress string, secret string, path string, target any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://%s%s", controllerAddress, path), nil)
+	if err != nil {
+		return err
+	}
+	if secret != "" {
+		req.Header.Set("Authorization", "Bearer "+secret)
+	}
+	resp, err := MihomoHTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("controller status: %s", resp.Status)
+	}
+	decoder := json.NewDecoder(io.LimitReader(resp.Body, mihomoControllerResponseLimit))
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf("decode controller response: %w", err)
+	}
+	return nil
 }

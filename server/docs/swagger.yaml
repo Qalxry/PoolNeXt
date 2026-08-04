@@ -368,6 +368,46 @@ paths:
       summary: Test selected proxy nodes and persist the result
       tags:
       - ProxyNode
+  /api/routing-rules:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List ordered Mihomo routing rules
+      tags:
+      - Workspace
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Replace ordered Mihomo routing rules
+      tags:
+      - Workspace
+  /api/runtime/connections:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get structured Mihomo forwarding connections
+      tags:
+      - Runtime
   /api/runtime/logs:
     get:
       produces:

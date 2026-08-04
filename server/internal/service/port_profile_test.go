@@ -48,6 +48,20 @@ func TestNormalizePortProfilePayloadUsesPoolNeXtDefaultName(t *testing.T) {
 	if normalized.ProxySettings.StrategyType != model.PortProfileStrategyFallback {
 		t.Fatalf("expected fallback as the default proxy-pool strategy, got %q", normalized.ProxySettings.StrategyType)
 	}
+	if normalized.ProxySettings.EntryMode != model.PortProfileEntryModeFixed {
+		t.Fatalf("expected legacy-compatible fixed entry mode, got %q", normalized.ProxySettings.EntryMode)
+	}
+}
+
+func TestNormalizePortProfilePayloadRejectsInvalidExpectedStatus(t *testing.T) {
+	_, err := normalizePortProfilePayload(PortProfilePayload{
+		MixedPort:     17895,
+		NodeIDs:       []int{1},
+		ProxySettings: model.PortProfileProxySettings{ExpectedStatus: "700"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "期望状态码无效") {
+		t.Fatalf("expected invalid status error, got %v", err)
+	}
 }
 
 func TestCreatePortProfileRejectsDuplicateStrategyGroupName(t *testing.T) {

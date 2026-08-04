@@ -206,6 +206,73 @@ func TestEnsureDatabaseSchemaUpToDateUpgradesLegacyDatabase(t *testing.T) {
 	}
 }
 
+func TestEnsureDatabaseSchemaUpToDateMigratesV5ToV6(t *testing.T) {
+	db := openBareTestSQLiteDB(t, "schema-v5-to-v6.db")
+	if err := migratepkg.ComposeAutoMigrator(schemaMetadataModels()...)(db); err != nil {
+		t.Fatalf("auto migrate schema metadata: %v", err)
+	}
+
+	legacyModels := make([]any, 0, len(registeredModels())-1)
+	for _, item := range registeredModels() {
+		if _, isRoutingRule := item.(*RoutingRule); isRoutingRule {
+			continue
+		}
+		legacyModels = append(legacyModels, item)
+	}
+	if err := migratepkg.ComposeAutoMigrator(legacyModels...)(db); err != nil {
+		t.Fatalf("auto migrate v5 business schema: %v", err)
+	}
+	for _, statement := range []string{
+		"CREATE UNIQUE INDEX idx_users_email_identity_unique ON users (email) WHERE email <> ''",
+		"CREATE UNIQUE INDEX idx_users_github_identity_unique ON users (github_id) WHERE github_id <> ''",
+		"CREATE UNIQUE INDEX idx_users_wechat_identity_unique ON users (wechat_id) WHERE wechat_id <> ''",
+	} {
+		if err := db.Exec(statement).Error; err != nil {
+			t.Fatalf("create v5 identity index: %v", err)
+		}
+	}
+	if db.Migrator().HasTable(&RoutingRule{}) {
+		t.Fatal("expected routing_rules to be absent before the v6 migration")
+	}
+
+	if err := db.Create(&User{
+		Username:    "v5-user",
+		Password:    "secret",
+		DisplayName: "V5 User",
+		Role:        1,
+		Status:      1,
+		AuthVersion: 1,
+	}).Error; err != nil {
+		t.Fatalf("seed v5 user: %v", err)
+	}
+	if err := db.Create(&DatabaseSchemaVersion{
+		ID:      databaseSchemaVersionRowID,
+		Version: 5,
+	}).Error; err != nil {
+		t.Fatalf("record v5 schema version: %v", err)
+	}
+
+	if err := ensureDatabaseSchemaUpToDate(db, "sqlite"); err != nil {
+		t.Fatalf("migrate v5 database to v6: %v", err)
+	}
+	if !db.Migrator().HasTable(&RoutingRule{}) {
+		t.Fatal("expected routing_rules to be created by the v6 migration")
+	}
+
+	var user User
+	if err := db.First(&user, "username = ?", "v5-user").Error; err != nil {
+		t.Fatalf("query v5 user after migration: %v", err)
+	}
+	loadVersion, _ := migratepkg.NewSchemaVersionStore((&DatabaseSchemaVersion{}).TableName(), databaseSchemaVersionRowID)
+	version, exists, err := loadVersion(db)
+	if err != nil {
+		t.Fatalf("load schema version after v6 migration: %v", err)
+	}
+	if !exists || version != 6 {
+		t.Fatalf("unexpected schema version after migration: exists=%v version=%d", exists, version)
+	}
+}
+
 func TestRunDatabaseSchemaMigrationDoesNotAdvanceVersionWhenValidationFails(t *testing.T) {
 	db := openBareTestSQLiteDB(t, "failed-validation.db")
 	loadVersion, saveVersion := migratepkg.NewSchemaVersionStore((&DatabaseSchemaVersion{}).TableName(), databaseSchemaVersionRowID)
@@ -306,6 +373,7 @@ func TestEnsureDatabaseSchemaUpToDateAddsSourceConfigMetadataColumns(t *testing.
 		&PortProfile{},
 		&PortProfileTemplate{},
 		&PortProfileNode{},
+		&RoutingRule{},
 		&RuntimeConfig{},
 		&KernelInstance{},
 	)(db); err != nil {
@@ -407,6 +475,7 @@ func TestEnsureDatabaseSchemaUpToDateRejectsSchemaVersionTwoWithoutSourceConfigM
 		&PortProfile{},
 		&PortProfileTemplate{},
 		&PortProfileNode{},
+		&RoutingRule{},
 		&RuntimeConfig{},
 		&KernelInstance{},
 	)(db); err != nil {

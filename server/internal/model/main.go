@@ -40,6 +40,7 @@ func registeredModels() []any {
 		&PortProfile{},
 		&PortProfileTemplate{},
 		&PortProfileNode{},
+		&RoutingRule{},
 		&RuntimeConfig{},
 		&KernelInstance{},
 	}
@@ -219,6 +220,8 @@ func migrationHooks() migratepkg.Hooks {
 				{Model: &ProxyNode{}, Table: "proxy_nodes", Column: "consecutive_failures"},
 				{Model: &ProxyNode{}, Table: "proxy_nodes", Column: "consecutive_successes"},
 				{Model: &ProxyNode{}, Table: "proxy_nodes", Column: "quarantined_at"},
+				{Model: &RoutingRule{}, Table: "routing_rules", Column: "target_profile_id"},
+				{Model: &RoutingRule{}, Table: "routing_rules", Column: "sort_order"},
 			},
 		),
 		AfterInitialize: migrateSQLiteDataIfNeeded,

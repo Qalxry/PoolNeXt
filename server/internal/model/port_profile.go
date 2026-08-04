@@ -11,6 +11,8 @@ const (
 	PortProfileStrategyURLTest     = "url-test"
 	PortProfileStrategyFallback    = "fallback"
 	PortProfileStrategyLoadBalance = "load-balance"
+	PortProfileEntryModeFixed      = "fixed"
+	PortProfileEntryModeRule       = "rule"
 )
 
 type PortProfile struct {
@@ -29,26 +31,35 @@ type PortProfile struct {
 }
 
 type PortProfileProxySettings struct {
-	StrategyType          string `json:"strategy_type"`
-	TestURL               string `json:"test_url"`
-	TestIntervalSeconds   int    `json:"test_interval_seconds"`
-	LoadBalanceStrategy   string `json:"load_balance_strategy"`
-	LoadBalanceLazy       bool   `json:"load_balance_lazy"`
-	LoadBalanceDisableUDP bool   `json:"load_balance_disable_udp"`
-	UDPEnabled            bool   `json:"udp_enabled"`
-	AuthEnabled           bool   `json:"auth_enabled"`
-	AuthUsername          string `json:"auth_username"`
-	AuthPassword          string `json:"auth_password"`
+	StrategyType                 string `json:"strategy_type"`
+	EntryMode                    string `json:"entry_mode"`
+	TestURL                      string `json:"test_url"`
+	TestIntervalSeconds          int    `json:"test_interval_seconds"`
+	TestTimeoutMilliseconds      int    `json:"test_timeout_milliseconds"`
+	MaxFailedTimes               int    `json:"max_failed_times"`
+	ExpectedStatus               string `json:"expected_status"`
+	URLTestToleranceMilliseconds int    `json:"url_test_tolerance_milliseconds"`
+	LoadBalanceStrategy          string `json:"load_balance_strategy"`
+	LoadBalanceLazy              bool   `json:"load_balance_lazy"`
+	LoadBalanceDisableUDP        bool   `json:"load_balance_disable_udp"`
+	UDPEnabled                   bool   `json:"udp_enabled"`
+	AuthEnabled                  bool   `json:"auth_enabled"`
+	AuthUsername                 string `json:"auth_username"`
+	AuthPassword                 string `json:"auth_password"`
 }
 
 func DefaultPortProfileProxySettings() PortProfileProxySettings {
 	return PortProfileProxySettings{
-		StrategyType:        PortProfileStrategyFallback,
-		TestURL:             "https://cp.cloudflare.com/generate_204",
-		TestIntervalSeconds: 300,
-		LoadBalanceStrategy: "consistent-hashing",
-		UDPEnabled:          true,
-		AuthEnabled:         false,
+		StrategyType:            PortProfileStrategyFallback,
+		EntryMode:               PortProfileEntryModeFixed,
+		TestURL:                 "https://cp.cloudflare.com/generate_204",
+		TestIntervalSeconds:     300,
+		TestTimeoutMilliseconds: 5000,
+		MaxFailedTimes:          5,
+		ExpectedStatus:          "204",
+		LoadBalanceStrategy:     "consistent-hashing",
+		UDPEnabled:              true,
+		AuthEnabled:             false,
 	}
 }
 
@@ -60,6 +71,9 @@ func ParsePortProfileProxySettings(raw string) (PortProfileProxySettings, error)
 	}
 	if err := json.Unmarshal([]byte(raw), &settings); err != nil {
 		return DefaultPortProfileProxySettings(), err
+	}
+	if strings.TrimSpace(settings.EntryMode) == "" {
+		settings.EntryMode = PortProfileEntryModeFixed
 	}
 	return settings, nil
 }

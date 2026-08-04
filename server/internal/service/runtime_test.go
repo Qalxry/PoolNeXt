@@ -571,6 +571,66 @@ func TestStopRuntimeDoesNotSignalUnownedStalePID(t *testing.T) {
 	}
 }
 
+func TestStopRuntimeFailureKeepsConnectionCollectorState(t *testing.T) {
+	setupServiceTestDB(t)
+	resetRuntimeRegistryForTest()
+
+	originalTerminator := terminateMihomoProcess
+	terminateMihomoProcess = func(process *runtimeProcess) error {
+		return errors.New("forced stop failure")
+	}
+	t.Cleanup(func() {
+		terminateMihomoProcess = originalTerminator
+		resetRuntimeRegistryForTest()
+	})
+
+	instance, err := ensureKernelInstance()
+	if err != nil {
+		t.Fatalf("ensure kernel instance: %v", err)
+	}
+	pid := 4242
+	instance.PID = &pid
+	instance.Status = model.KernelInstanceStatusRunning
+	if err := model.DB.Save(instance).Error; err != nil {
+		t.Fatalf("save running instance: %v", err)
+	}
+
+	process := &runtimeProcess{
+		generation:        1,
+		kernelType:        snapshotRuntimeOptions().KernelType,
+		controllerAddress: "127.0.0.1:19090",
+		controllerSecret:  "secret",
+		done:              make(chan struct{}),
+		settled:           make(chan struct{}),
+	}
+	runtimeRegistry.mu.Lock()
+	runtimeRegistry.generation = process.generation
+	runtimeRegistry.process = process
+	runtimeRegistry.mu.Unlock()
+
+	connectionRegistry.mu.Lock()
+	connectionRegistry.generation = 7
+	connectionRegistry.available = true
+	connectionRegistry.active = map[string]RuntimeConnectionEntry{
+		"connection-1": {ID: "connection-1", State: "active", StartedAt: time.Now()},
+	}
+	connectionRegistry.mu.Unlock()
+
+	_, err = StopRuntime(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "forced stop failure") {
+		t.Fatalf("expected stop failure, got %v", err)
+	}
+
+	connectionRegistry.mu.Lock()
+	defer connectionRegistry.mu.Unlock()
+	if connectionRegistry.generation != 7 {
+		t.Fatalf("stop failure restarted the connection collector: generation=%d", connectionRegistry.generation)
+	}
+	if _, exists := connectionRegistry.active["connection-1"]; !exists {
+		t.Fatal("stop failure discarded the active connection snapshot")
+	}
+}
+
 func TestGetRuntimeStatusDoesNotExposeControllerOrNodeSecrets(t *testing.T) {
 	setupServiceTestDB(t)
 	resetRuntimeRegistryForTest()
@@ -1072,6 +1132,7 @@ func readMihomoMode(controllerAddress string, secret string) (string, error) {
 }
 
 func resetRuntimeRegistryForTest() {
+	resetRuntimeConnectionRegistryForTest()
 	runtimeRegistry.operationMu.Lock()
 	defer runtimeRegistry.operationMu.Unlock()
 	runtimeRegistry.mu.Lock()

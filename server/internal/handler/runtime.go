@@ -83,3 +83,13 @@ func GetRuntimeLogs(c *gin.Context) {
 	}
 	respondSuccess(c, items)
 }
+
+// GetRuntimeConnections godoc
+// @Summary Get structured Mihomo forwarding connections
+// @Tags Runtime
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/runtime/connections [get]
+func GetRuntimeConnections(c *gin.Context) {
+	respondSuccess(c, service.GetRuntimeConnections())
+}

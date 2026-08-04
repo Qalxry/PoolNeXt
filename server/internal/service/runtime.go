@@ -55,6 +55,9 @@ type RuntimeStatus struct {
 	ProfileCount     int                             `json:"profile_count"`
 	ListenerCount    int                             `json:"listener_count"`
 	Listeners        []runtimeconfig.RuntimeListener `json:"listeners"`
+	ConfigPending    bool                            `json:"config_pending"`
+	ConfigValid      bool                            `json:"config_valid"`
+	ConfigError      string                          `json:"config_error,omitempty"`
 }
 
 type runtimeOptionSnapshot struct {
@@ -243,6 +246,7 @@ func startRuntime(ctx context.Context, allowAlreadyRunning bool, action string) 
 	if err := saveRuntimeInstance(instance); err != nil {
 		return nil, cleanupStartedRuntime(instance, process, fmt.Errorf("保存 Mihomo 运行状态失败: %w", err))
 	}
+	connectionRegistry.start(process)
 	runtimeRegistry.setResumeAfterNodeHealthRecovery(false)
 	_ = AppLog.PushEvent(AppLogEventInput{
 		Classification: model.AppLogClassificationBusiness,
@@ -316,6 +320,7 @@ func stopRuntime(ctx context.Context, resumeAfterNodeHealthRecovery bool) (*Runt
 			}
 		}
 	}
+	connectionRegistry.stop()
 
 	now := time.Now()
 	instance.Status = model.KernelInstanceStatusStopped
@@ -464,11 +469,15 @@ func GetRuntimeStatus(ctx context.Context) (*RuntimeStatus, error) {
 		AutoStartEnabled: options.AutoStartEnabled,
 		APIHealthy:       apiHealthy,
 		APIVersion:       apiVersion,
+		ConfigValid:      renderErr == nil,
 	}
 	if renderErr == nil {
 		status.ProfileCount = rendered.ProfileCount
 		status.ListenerCount = rendered.ListenerCount
 		status.Listeners = rendered.Listeners
+		status.ConfigPending = process != nil && instance.ActiveConfigChecksum != "" && instance.ActiveConfigChecksum != rendered.Checksum
+	} else {
+		status.ConfigError = renderErr.Error()
 	}
 	return status, nil
 }
@@ -549,10 +558,19 @@ func buildFinalRuntimeConfig(options runtimeOptionSnapshot, persistSnapshots boo
 	if options.ControllerSecret == "" {
 		return nil, "", "", fmt.Errorf("Mihomo 控制密钥为空")
 	}
+	profileIDs := make([]int, 0, len(enabled))
+	for _, profile := range enabled {
+		profileIDs = append(profileIDs, profile.Profile.ID)
+	}
+	rules, err := listEnabledRoutingRulesForRuntime(profileIDs)
+	if err != nil {
+		return nil, "", "", err
+	}
 	workDir := filepath.Join(runtimeDataRoot, "runtime", options.KernelType)
 	configPath := filepath.Join(workDir, runtimeConfigFileName)
 	rendered, err := runtimeconfig.RenderFinalMihomoConfig(runtimeconfig.AggregatedMihomoInput{
 		Profiles:          enabled,
+		Rules:             rules,
 		AllowLAN:          options.AllowLAN,
 		Mode:              options.Mode,
 		ControllerAddress: options.ControllerAddress,
@@ -892,6 +910,7 @@ func (registry *runtimeProcessRegistry) settleProcessExit(process *runtimeProces
 	if !registry.detachProcess(process) {
 		return
 	}
+	connectionRegistry.stop()
 	if err != nil {
 		registry.appendLog("system", model.AppLogLevelError, fmt.Sprintf("Mihomo 进程退出: %v", err))
 	}

@@ -1,12 +1,34 @@
 package kernel
 
 import (
+	"context"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestGetMihomoConnectionsDecodesControllerSnapshot(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer controller-secret" {
+			t.Fatalf("missing controller authorization header")
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"downloadTotal":20,"uploadTotal":10,"memory":30,"connections":[{"id":"connection-1","metadata":{"network":"tcp","sourceIP":"127.0.0.1","sourcePort":"50000","host":"example.com","destinationPort":"443","inboundName":"entry"},"upload":4,"download":5,"start":"2026-07-16T00:00:00Z","chains":["node","group"],"providerChains":[],"rule":"DOMAIN","rulePayload":"example.com"}]}`))
+	}))
+	defer server.Close()
+
+	payload, err := GetMihomoConnections(context.Background(), strings.TrimPrefix(server.URL, "http://"), "controller-secret")
+	if err != nil {
+		t.Fatalf("get connections: %v", err)
+	}
+	if len(payload.Connections) != 1 || payload.Connections[0].Metadata.Host != "example.com" {
+		t.Fatalf("unexpected snapshot: %+v", payload)
+	}
+}
 
 func TestStartMihomoProcessUsesAbsolutePaths(t *testing.T) {
 	tempDir := t.TempDir()
