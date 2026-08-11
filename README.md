@@ -17,7 +17,7 @@ A proxy pool control panel built with Gin and Next.js. Its core goal is to organ
 > This project is only a proxy pool control panel and does NOT provide nodes or methods to obtain them. It is intended for learning, research, and technical exchange only. Any illegal use is strictly prohibited.
 
 > [!WARNING]
-> On first startup, PoolNeXt writes a random one-time root password to `poolnext-bootstrap.txt` beside the SQLite database (or to `POOLNEXT_BOOTSTRAP_FILE`). Read it locally, sign in, and change the password immediately; the file is then removed.
+> On first startup, PoolNeXt prints a random one-time root password to the server stdout. Sign in with it and change the password immediately; the password is shown only once and is never stored in a file. If you lose it, run `poolnext-server --reset-password` to reset it interactively.
 
 ---
 
@@ -68,7 +68,7 @@ This project provides a clean and user-friendly UI for efficiently managing and 
 
 Login URL: `http://IP:3000/`  
 Username: `root`  
-Password: read the one-time value from `/data/poolnext-bootstrap.txt` in Docker, or from `poolnext-bootstrap.txt` beside the SQLite database.
+Password: the one-time random value printed to the server stdout on first startup (with Docker, `docker logs poolnext`). You will be required to change it after the first sign-in.
 
 ### Docker Deployment
 
@@ -100,7 +100,6 @@ services:
 #     Expose proxy listening ports as needed
     environment:
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET to a strong random value}
-      POOLNEXT_BOOTSTRAP_FILE: /data/poolnext-bootstrap.txt
 #     If SQL_DSN is specified, the following will be ignored
       SQLITE_PATH: /data/poolx.db
 #     To use SQLite, comment out SQL_DSN and remove postgres service
@@ -127,9 +126,9 @@ Access URL: http://localhost:3000
 
 Initial credentials:
 * Username: `root`
-* Password: the random one-time value in `/path/to/poolnext-bootstrap.txt`
+* Password: the random one-time value printed to the server stdout on first startup
 
-The bootstrap file is mode `0600` and is removed after the first password change. Production startup rejects missing, weak, or placeholder `SESSION_SECRET` values.
+The password is shown only once and is never written to a file; you must change it after the first sign-in. If you lose it, stop the server and run `poolnext-server --reset-password` to reset it interactively. Production startup rejects missing, weak, or placeholder `SESSION_SECRET` values.
 
 
 ## Configuration

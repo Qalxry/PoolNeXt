@@ -33,6 +33,7 @@ SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -bui
 | `--port` | 指定 Server 监听端口 | `3000` |
 | `--log-dir` | 指定日志目录 | 空 |
 | `--version` | 输出当前版本后退出 | `false` |
+| `--reset-password` | 交互式重置管理员密码后退出（不启动服务） | `false` |
 | `--help` | 输出帮助信息后退出 | `false` |
 
 ### 1.2 环境变量
@@ -44,7 +45,6 @@ SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -bui
 | `LOG_LEVEL` | 日志等级 | `info` |
 | `SESSION_SECRET` | Session 签名密钥；生产模式至少 32 字节且不能是占位值 | 无，生产必填 |
 | `SESSION_COOKIE_SECURE` | 强制 Session Cookie 使用 Secure | TLS 请求自动启用，否则 `false` |
-| `POOLNEXT_BOOTSTRAP_FILE` | 首次 root 一次性凭据文件路径 | SQLite 数据库旁的 `poolnext-bootstrap.txt` |
 | `TRUSTED_PROXIES` | 可信反向代理 IP/CIDR，逗号分隔 | 空，不信任转发头 |
 | `MAX_REQUEST_BODY_BYTES` | 普通请求体上限 | `8388608` |
 | `MAX_UPLOAD_BODY_BYTES` | 已知上传路由请求体上限 | `134217728` |
@@ -57,7 +57,8 @@ SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -bui
 说明：
 
 * `SESSION_SECRET` 在生产环境必须显式配置；仅测试二进制，或同时设置 `GIN_MODE=debug` 与 `POOLNEXT_ALLOW_EPHEMERAL_SESSION_SECRET=true` 时，才允许临时 secret
-* 首次 root 密码随机生成并写入权限 `0600` 的 bootstrap 文件，首次改密后删除；密码不会写入日志
+* 首次启动会在 stdout 打印一次随机生成的 root 一次性密码，不会写入任何文件；首次登录后强制要求修改密码
+* 忘记密码时，运行 `poolnext-server --reset-password` 交互式重置管理员密码（不启动服务，不暴露网络）
 * `REDIS_CONN_STRING` 未配置时，相关能力退化为进程内实现
 * 服务端升级默认从 `Qalxry/PoolNeXt` 查询发布版本，可通过运行时配置 `ServerUpdateRepo` 覆盖
 

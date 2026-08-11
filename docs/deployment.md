@@ -36,7 +36,6 @@ make build
 ```bash
 export SESSION_SECRET="$(openssl rand -hex 32)"
 export SQLITE_PATH="$PWD/server/poolnext.db"
-export POOLNEXT_BOOTSTRAP_FILE="$PWD/server/poolnext-bootstrap.txt"
 export LOG_LEVEL='info'
 # 可选：使用 PostgreSQL
 # export SQL_DSN='postgres://template:secret@127.0.0.1:5432/poolx?sslmode=disable'
@@ -102,7 +101,6 @@ services:
       - "3000:3000"
     environment:
       SESSION_SECRET: ${SESSION_SECRET:?请先设置高强度 SESSION_SECRET}
-      POOLNEXT_BOOTSTRAP_FILE: /data/poolnext-bootstrap.txt
       SQLITE_PATH: /data/poolnext.db
       SQL_DSN: postgres://poolx:${POSTGRES_PASSWORD_URLENCODED:?请设置 URL 编码后的数据库密码}@postgres:5432/poolx?sslmode=disable
       GIN_MODE: release
@@ -128,7 +126,7 @@ cd server
 docker compose up -d
 ```
 
-默认使用命名卷，首次挂载时会继承镜像内 `/data` 的 UID/GID。若改成宿主机 bind mount，需先执行 `chown -R 10001:10001 <数据目录>`，否则非 root 进程无法创建数据库、上传目录和 bootstrap 文件。
+默认使用命名卷，首次挂载时会继承镜像内 `/data` 的 UID/GID。若改成宿主机 bind mount，需先执行 `chown -R 10001:10001 <数据目录>`，否则非 root 进程无法创建数据库和上传目录。
 
 ## 3. 首次登录
 
@@ -137,9 +135,9 @@ docker compose up -d
 初始账号：
 
 * 用户名：`root`
-* 密码：读取 `/data/poolnext-bootstrap.txt`（本地 SQLite 部署则读取数据库旁的同名文件）
+* 密码：首次启动时在服务 stdout（Docker 用 `docker logs poolnext` 查看）打印的一次性随机密码
 
-该文件权限为 `0600`，首次修改密码后自动删除。生产模式在数据库初始化前拒绝缺失、弱值或占位值 `SESSION_SECRET`。
+该密码只显示一次，不会写入任何文件；首次登录后系统强制要求修改密码。若忘记密码，可停止服务后运行 `poolnext-server --reset-password` 交互式重置管理员密码（Docker 部署：`docker compose exec poolnext poolnext-server --reset-password`）。生产模式在数据库初始化前拒绝缺失、弱值或占位值 `SESSION_SECRET`。
 
 如需打开内置 Clash 控制台，可在运行状态页点击“打开 Clash 控制台”，或直接访问：
 

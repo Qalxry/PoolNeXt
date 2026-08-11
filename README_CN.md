@@ -16,7 +16,7 @@
 > 本项目仅为代理池控制面, 不提供节点以及其获取方式。本项目仅供学习、研究与技术交流使用，禁止用于任何非法用途。
 
 > [!WARNING]
-> 首次启动时，PoolNeXt 会在 SQLite 数据库旁（或 `POOLNEXT_BOOTSTRAP_FILE` 指定位置）写入 `poolnext-bootstrap.txt`，其中包含随机一次性 root 密码。请仅在本机读取，登录后立即修改密码；文件随后会被删除。
+> 首次启动时，PoolNeXt 会在服务 stdout 打印随机一次性 root 密码。请使用该密码登录，登录后立即修改；密码只显示这一次，不会写入任何文件。若遗忘密码，运行 `poolnext-server --reset-password` 交互式重置。
 
 ## 项目介绍
 
@@ -57,7 +57,7 @@
 
 Login URL: `http://IP:3000/`
 Username: `root`
-Password: Docker 部署读取 `/data/poolnext-bootstrap.txt`；本地部署读取 SQLite 数据库旁的 `poolnext-bootstrap.txt`。
+Password: 首次启动时打印在服务 stdout 的随机一次性密码（Docker 部署用 `docker logs poolnext` 查看）。首次登录后强制要求修改密码。
 
 ### Docker 部署
 
@@ -89,7 +89,6 @@ services:
 #     开放代理监听端口
     environment:
       SESSION_SECRET: ${SESSION_SECRET:?请先设置高强度 SESSION_SECRET}
-      POOLNEXT_BOOTSTRAP_FILE: /data/poolnext-bootstrap.txt
 #     在指定 SQL_DSN 的情况下, 以下内容不会生效
       SQLITE_PATH: /data/poolx.db
 #     如果使用 Sqlite, 注释掉 SQL_DSN, 并且移除 postgres service
@@ -116,9 +115,9 @@ SQLITE_PATH=/path/to/poolx.db \
 初始账号：
 
 * 用户名：`root`
-* 密码：`/path/to/poolnext-bootstrap.txt` 中的随机一次性密码
+* 密码：首次启动时打印在服务 stdout 的随机一次性密码
 
-凭据文件权限为 `0600`，首次修改密码后自动删除。生产模式会拒绝缺失、弱值或占位值 `SESSION_SECRET`。
+密码只显示这一次，不会写入任何文件；首次登录后强制要求修改密码。若遗忘密码，停止服务后运行 `poolnext-server --reset-password` 交互式重置。生产模式会拒绝缺失、弱值或占位值 `SESSION_SECRET`。
 
 
 ## 配置说明
