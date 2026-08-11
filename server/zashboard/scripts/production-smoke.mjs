@@ -2,7 +2,7 @@
 
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -21,7 +21,6 @@ if (binaryIndex === -1 || !args[binaryIndex + 1]) {
 
 const binaryPath = resolve(args[binaryIndex + 1])
 const dataDir = await mkdtemp(resolve(tmpdir(), 'poolnext-production-smoke-'))
-const bootstrapPath = resolve(dataDir, 'poolnext-bootstrap.txt')
 const sqlitePath = resolve(dataDir, 'poolnext.db')
 const uploadPath = resolve(dataDir, 'upload')
 const port = await reservePort()
@@ -35,7 +34,6 @@ const server = spawn(binaryPath, [], {
     GIN_MODE: 'release',
     LOG_LEVEL: 'warn',
     PORT: String(port),
-    POOLNEXT_BOOTSTRAP_FILE: bootstrapPath,
     SESSION_SECRET: randomBytes(32).toString('hex'),
     SQLITE_PATH: sqlitePath,
     UPLOAD_PATH: uploadPath,
@@ -54,9 +52,8 @@ for (const stream of [server.stdout, server.stderr]) {
 let browser
 try {
   await waitForReady(`${baseURL}/api/status`, server)
-  const bootstrapContents = await readFile(bootstrapPath, 'utf8')
-  const bootstrapPassword = /^password:\s*(.+)$/m.exec(bootstrapContents)?.[1]?.trim()
-  if (!bootstrapPassword) throw new Error('bootstrap password file does not contain a password')
+  const bootstrapPassword = /一次性密码:\s*(.+)$/m.exec(serverOutput.join(''))?.[1]?.trim()
+  if (!bootstrapPassword) throw new Error('bootstrap password was not printed to server stdout')
 
   browser = await chromium.launch({ headless: true })
   const changedPassword = `Smoke-${randomBytes(5).toString('hex')}`
