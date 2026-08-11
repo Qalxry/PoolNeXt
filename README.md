@@ -83,9 +83,7 @@ The script automatically:
 - Registers a `systemd` service when available, otherwise runs in the background with `nohup`
 - Keeps data files (database, logs, uploads) next to the binary in `$HOME/poolnext/`
 
-After install, sign in at `http://IP:3000/` with `root` and the one-time password from the first-start log:
-- systemd: `journalctl -u poolnext -n 60 | grep '一次性密码'`
-- nohup mode: `grep '一次性密码' ~/poolnext/poolnext.log`
+After install, sign in at `http://IP:3000/` with `root`. The script prints how to obtain the one-time password (the exact location depends on the release behavior; follow the script's hint). You will be required to change the password after the first sign-in.
 
 Update to the latest release at any time:
 

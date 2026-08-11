@@ -17,8 +17,8 @@
 #   - 数据文件（数据库、日志、上传）与二进制同目录
 #   - SESSION_SECRET 优先取环境变量，否则首次自动生成并持久化到 0600 文件
 #   - 所有下载走环境变量代理（https_proxy 等），curl 自动跟随
-#   - 首次启动的一次性 root 密码: systemd 用 journalctl -u poolnext 查看，
-#     nohup 模式查看 $HOME_DIR/poolnext.log
+#   - 首次启动的一次性 root 密码安装后会在提示中给出查看方式
+#     （新版 stdout 打印；v1.0.0 及更早写 poolnext-bootstrap.txt）
 
 set -euo pipefail
 
@@ -147,7 +147,10 @@ install() {
     ensure_secret
     log "已安装到: $BINARY_PATH"
     ensure_service
-    if command -v systemctl >/dev/null 2>&1 && systemctl is-system-running >/dev/null 2>&1; then
+    # 兼容两种版本行为：新版二进制 stdout 打印；旧版（v1.0.0）写 bootstrap 文件
+    if [[ -f "$HOME_DIR/poolnext-bootstrap.txt" ]]; then
+        log "首次登录一次性密码: cat $HOME_DIR/poolnext-bootstrap.txt"
+    elif command -v systemctl >/dev/null 2>&1 && systemctl is-system-running >/dev/null 2>&1; then
         log "首次登录一次性密码: journalctl -u $SERVICE_NAME -n 60 | grep '一次性密码'"
     else
         log "首次登录一次性密码: grep '一次性密码' $HOME_DIR/poolnext.log"

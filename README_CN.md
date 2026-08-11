@@ -73,10 +73,7 @@ bash poolnext-install.sh install
 - 检测到 systemd 时注册为系统服务，否则用 nohup 后台运行
 - 数据文件（数据库、日志、上传）与二进制同目录，位于 `$HOME/poolnext/`
 
-安装后访问 `http://IP:3000/`，用户名 `root`，一次性密码在首次启动日志中：
-
-- systemd 模式：`journalctl -u poolnext -n 60 | grep '一次性密码'`
-- nohup 模式：`grep '一次性密码' ~/poolnext/poolnext.log`
+安装后访问 `http://IP:3000/`，用户名 `root`。脚本安装完成时会提示一次性密码的查看方式（不同版本行为略有差异，以脚本提示为准）。首次登录后强制要求修改密码。
 
 随时更新到最新版：
 
