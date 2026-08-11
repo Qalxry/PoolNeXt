@@ -143,7 +143,15 @@ verify-assets: ## Verify both generated frontend trees contain entrypoints and e
 	@test -n "$$(find "$(ZASHBOARD_DIR)/dist/assets" -type f -name '*.js' -print -quit 2>/dev/null)" || { echo "missing Zashboard JavaScript chunks" >&2; exit 1; }
 
 verify-embedded-assets: verify-assets ## Compile-test that production embeds both frontends.
-	cd "$(SERVER_DIR)" && $(GO) test -tags embedassets -run '^TestProductionBuildEmbedsBothFrontends$$' -count=1 .
+	@host="$$($(GO) env GOHOSTOS)$$($(GO) env GOHOSTARCH)"; \
+	target="$(GOOS)$(GOARCH)"; \
+	cd "$(SERVER_DIR)"; \
+	if [ "$$target" = "$$host" ]; then \
+		$(GO) test -tags embedassets -run '^TestProductionBuildEmbedsBothFrontends$$' -count=1 .; \
+	else \
+		out="$${TMPDIR:-/tmp}/poolx-embed-verify"; \
+		$(GO) test -tags embedassets -run '^$$' -c -o "$$out" . && rm -f "$$out"; \
+	fi
 
 build-server-from-assets: verify-embedded-assets ## Build the canonical server from existing verified assets.
 	@mkdir -p "$(dir $(SERVER_BINARY))"
