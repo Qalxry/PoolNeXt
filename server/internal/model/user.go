@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"poolx/internal/pkg/common"
 	"poolx/internal/pkg/utils/security"
 	"strconv"
@@ -166,7 +165,6 @@ func (user *User) UpdateWithPasswordPolicy(updatePassword bool, mustChangePasswo
 		}
 	}
 
-	wasBootstrapRoot := false
 	err = DB.Transaction(func(tx *gorm.DB) error {
 		var current User
 		if err := tx.First(&current, "id = ?", user.Id).Error; err != nil {
@@ -219,18 +217,9 @@ func (user *User) UpdateWithPasswordPolicy(updatePassword bool, mustChangePasswo
 		if err := tx.First(user, "id = ?", user.Id).Error; err != nil {
 			return err
 		}
-		wasBootstrapRoot = updatePassword && !mustChangePassword && current.Role == common.RoleRootUser && current.MustChangePassword
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	if wasBootstrapRoot {
-		if err := removeBootstrapCredentialFile(); err != nil {
-			slog.Warn("remove bootstrap credential file failed", "error", err)
-		}
-	}
-	return nil
+	return err
 }
 
 func (user *User) Delete() error {

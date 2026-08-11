@@ -10,10 +10,11 @@ import (
 )
 
 var (
-	Port         = flag.Int("port", 3000, "the listening port")
-	PrintVersion = flag.Bool("version", false, "print version and exit")
-	PrintHelp    = flag.Bool("help", false, "print help and exit")
-	LogDir       = flag.String("log-dir", "", "specify the log directory")
+	Port          = flag.Int("port", 3000, "the listening port")
+	PrintVersion  = flag.Bool("version", false, "print version and exit")
+	PrintHelp     = flag.Bool("help", false, "print help and exit")
+	ResetPassword = flag.Bool("reset-password", false, "interactively reset the admin password and exit")
+	LogDir        = flag.String("log-dir", "", "specify the log directory")
 )
 
 // UploadPath Maybe override by ENV_VAR
@@ -21,7 +22,7 @@ var UploadPath = "upload"
 
 func printHelp() {
 	fmt.Println("PoolNeXt " + Version + " - Proxy Pool Control Plane backend.")
-	fmt.Println("Usage: poolnext-server [--port <port>] [--log-dir <log directory>] [--version] [--help]")
+	fmt.Println("Usage: poolnext-server [--port <port>] [--log-dir <log directory>] [--version] [--reset-password] [--help]")
 }
 
 func init() {

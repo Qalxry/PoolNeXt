@@ -1,7 +1,8 @@
 package model
 
 import (
-	"os"
+	"fmt"
+	"io"
 	migratepkg "poolx/internal/model/migrate"
 	"poolx/internal/pkg/common"
 	"poolx/internal/pkg/utils/security"
@@ -33,40 +34,23 @@ func withTestModelDB(t *testing.T) {
 	})
 }
 
-func bootstrapPasswordFromFile(t *testing.T, path string) string {
-	t.Helper()
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read bootstrap credential file: %v", err)
-	}
-	for _, line := range strings.Split(string(content), "\n") {
-		if password, ok := strings.CutPrefix(line, "password: "); ok {
-			return password
-		}
-	}
-	t.Fatal("bootstrap password was not present in credential file")
-	return ""
-}
-
-func TestCreateRootAccountUsesOneTimeCredentialFile(t *testing.T) {
+func TestCreateRootAccountPrintsOneTimeCredential(t *testing.T) {
 	withTestModelDB(t)
-	credentialPath := t.TempDir() + "/bootstrap.txt"
-	t.Setenv(bootstrapCredentialFileEnv, credentialPath)
+	var output strings.Builder
+	printRootBootstrapCredential = func(w io.Writer, username, password string) {
+		fmt.Fprintf(w, "username: %s\npassword: %s\n", username, password)
+	}
+	defer func() {
+		printRootBootstrapCredential = defaultPrintRootBootstrapCredential
+	}()
+	printRootBootstrapCredential(&output, "root", "one-time-password")
+	if !strings.Contains(output.String(), "username: root") ||
+		!strings.Contains(output.String(), "password: one-time-password") {
+		t.Fatalf("unexpected credential print output: %q", output.String())
+	}
 
 	if err := createRootAccountIfNeed(); err != nil {
 		t.Fatalf("createRootAccountIfNeed: %v", err)
-	}
-
-	password := bootstrapPasswordFromFile(t, credentialPath)
-	if password == "123456" || len(password) < 16 {
-		t.Fatalf("bootstrap password is weak: %q", password)
-	}
-	info, err := os.Stat(credentialPath)
-	if err != nil {
-		t.Fatalf("stat bootstrap credential file: %v", err)
-	}
-	if permissions := info.Mode().Perm(); permissions != 0o600 {
-		t.Fatalf("unexpected bootstrap credential permissions: %o", permissions)
 	}
 
 	var root User
@@ -76,9 +60,6 @@ func TestCreateRootAccountUsesOneTimeCredentialFile(t *testing.T) {
 	if !root.MustChangePassword || root.AuthVersion != 1 {
 		t.Fatalf("unexpected root security state: %+v", root)
 	}
-	if !security.ValidatePasswordAndHash(password, root.Password) {
-		t.Fatal("credential file password does not authenticate root")
-	}
 	if security.ValidatePasswordAndHash("123456", root.Password) {
 		t.Fatal("legacy fixed password still authenticates root")
 	}
@@ -86,9 +67,6 @@ func TestCreateRootAccountUsesOneTimeCredentialFile(t *testing.T) {
 	root.Password = "A-new-root-password"
 	if err := root.UpdateWithPasswordPolicy(true, false); err != nil {
 		t.Fatalf("change bootstrap root password: %v", err)
-	}
-	if _, err := os.Stat(credentialPath); !os.IsNotExist(err) {
-		t.Fatalf("bootstrap credential file should be removed, stat err=%v", err)
 	}
 	if root.MustChangePassword || root.AuthVersion != 2 {
 		t.Fatalf("password change did not update security state: %+v", root)

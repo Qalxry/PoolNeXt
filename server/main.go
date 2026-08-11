@@ -4,6 +4,7 @@ import (
 	"log"
 	_ "poolx/docs"
 	"poolx/internal/app"
+	"poolx/internal/pkg/common"
 )
 
 // @title PoolNeXt Server API
@@ -16,6 +17,13 @@ import (
 // @name Authorization
 // @description Admin API can use Bearer Token.
 func main() {
+	if *common.ResetPassword {
+		if err := app.ResetAdminPasswordCLI(); err != nil {
+			log.Fatalf("reset admin password: %v", err)
+		}
+		return
+	}
+
 	assets, err := loadFrontendAssets()
 	if err != nil {
 		log.Fatalf("load frontend assets: %v", err)

@@ -3,14 +3,13 @@ package model
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	migratepkg "poolx/internal/model/migrate"
 	"poolx/internal/pkg/common"
 	"poolx/internal/pkg/utils/security"
 	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/glebarez/sqlite"
@@ -20,8 +19,6 @@ import (
 )
 
 var DB *gorm.DB
-
-const bootstrapCredentialFileEnv = "POOLNEXT_BOOTSTRAP_FILE"
 
 type dbModel struct {
 	value     any
@@ -72,6 +69,23 @@ func buildDBModels() ([]dbModel, error) {
 	return result, nil
 }
 
+// printRootBootstrapCredential writes the one-time bootstrap credentials to w.
+// It is a package-level variable so tests can capture the output.
+var printRootBootstrapCredential = defaultPrintRootBootstrapCredential
+
+func defaultPrintRootBootstrapCredential(w io.Writer, username, password string) {
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "PoolNeXt 首次启动：已创建初始管理员账号")
+	fmt.Fprintln(w, "==================================================")
+	fmt.Fprintf(w, "用户名: %s\n", username)
+	fmt.Fprintf(w, "一次性密码: %s\n", password)
+	fmt.Fprintln(w, "--------------------------------------------------")
+	fmt.Fprintln(w, "请立即登录并修改密码，此密码只显示这一次，不会保存到任何文件。")
+	fmt.Fprintln(w, "若忘记密码，请运行: poolnext-server --reset-password")
+	fmt.Fprintln(w, "==================================================")
+	fmt.Fprintln(w)
+}
+
 func createRootAccountIfNeed() error {
 	var user User
 	err := DB.First(&user).Error
@@ -86,10 +100,6 @@ func createRootAccountIfNeed() error {
 	if oneTimePassword == "" {
 		return errors.New("generate bootstrap root password failed")
 	}
-	credentialPath, err := writeBootstrapCredentialFile("root", oneTimePassword)
-	if err != nil {
-		return err
-	}
 	rootUser := User{
 		Username:           "root",
 		Password:           oneTimePassword,
@@ -100,74 +110,13 @@ func createRootAccountIfNeed() error {
 		MustChangePassword: true,
 	}
 	if err := rootUser.Insert(); err != nil {
-		_ = removeBootstrapCredentialFile()
 		return fmt.Errorf("create bootstrap root user: %w", err)
 	}
+	printRootBootstrapCredential(os.Stdout, "root", oneTimePassword)
 	slog.Warn(
 		"initial root account created; change the one-time password immediately",
 		"username", rootUser.Username,
-		"bootstrap_credentials_file", credentialPath,
 	)
-	return nil
-}
-
-func bootstrapCredentialFilePath() (string, error) {
-	configured := strings.TrimSpace(os.Getenv(bootstrapCredentialFileEnv))
-	if configured != "" {
-		return filepath.Abs(configured)
-	}
-	baseDir := "."
-	if common.SQLDSN == "" && common.SQLitePath != "" {
-		baseDir = filepath.Dir(common.SQLitePath)
-	}
-	return filepath.Abs(filepath.Join(baseDir, "poolnext-bootstrap.txt"))
-}
-
-func writeBootstrapCredentialFile(username string, password string) (string, error) {
-	path, err := bootstrapCredentialFilePath()
-	if err != nil {
-		return "", fmt.Errorf("resolve bootstrap credential path: %w", err)
-	}
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	if err != nil {
-		if errors.Is(err, os.ErrExist) {
-			return "", fmt.Errorf("bootstrap credential file already exists at %s; remove it only after confirming the root account state", path)
-		}
-		return "", fmt.Errorf("create bootstrap credential file: %w", err)
-	}
-	removeOnFailure := true
-	defer func() {
-		_ = file.Close()
-		if removeOnFailure {
-			_ = os.Remove(path)
-		}
-	}()
-	content := fmt.Sprintf(
-		"PoolNeXt one-time bootstrap credentials\nusername: %s\npassword: %s\n\nSign in and change this password immediately. This file is removed after the first password change.\n",
-		username,
-		password,
-	)
-	if _, err := file.WriteString(content); err != nil {
-		return "", fmt.Errorf("write bootstrap credential file: %w", err)
-	}
-	if err := file.Sync(); err != nil {
-		return "", fmt.Errorf("sync bootstrap credential file: %w", err)
-	}
-	if err := file.Close(); err != nil {
-		return "", fmt.Errorf("close bootstrap credential file: %w", err)
-	}
-	removeOnFailure = false
-	return path, nil
-}
-
-func removeBootstrapCredentialFile() error {
-	path, err := bootstrapCredentialFilePath()
-	if err != nil {
-		return err
-	}
-	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
 	return nil
 }
 
