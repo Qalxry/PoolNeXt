@@ -15,6 +15,24 @@
 
 ## 2. 启动方式
 
+### 2.0 一键安装脚本（Linux，推荐）
+
+```bash
+curl -fsSL -o poolnext-install.sh https://raw.githubusercontent.com/Qalxry/PoolNeXt/main/scripts/poolnext-install.sh
+bash poolnext-install.sh install
+```
+
+脚本自动识别 `linux/amd64` 与 `linux/arm64` 并从 GitHub Release 下载最新二进制；首次运行自动生成并持久化强 `SESSION_SECRET`（存为 `poolnext-secret`，权限 `0600`，环境变量可覆盖）；检测到 systemd 时注册为 `poolnext` 服务，否则 nohup 后台运行。数据文件（数据库、日志、上传）默认位于 `$HOME/poolnext/`，可通过 `POOLNEXT_HOME`、`POOLNEXT_PORT`、`POOLNEXT_REPO` 调整。
+
+更新到最新版：
+
+```bash
+bash poolnext-install.sh update          # 更新到最新版
+bash poolnext-install.sh update v1.0.1   # 更新到指定版本
+```
+
+首次登录的一次性密码：systemd 模式用 `journalctl -u poolnext -n 60 | grep '一次性密码'`；nohup 模式查看 `$HOME_DIR/poolnext.log`。
+
 ### 2.1 构建前端静态产物
 
 ```bash

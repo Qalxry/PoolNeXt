@@ -57,7 +57,34 @@
 
 Login URL: `http://IP:3000/`
 Username: `root`
-Password: 首次启动时打印在服务 stdout 的随机一次性密码（Docker 部署用 `docker logs poolnext` 查看）。首次登录后强制要求修改密码。
+Password: 首次启动时打印在服务 stdout 的随机一次性密码。首次登录后强制要求修改密码。
+
+### 一键安装脚本（Linux，推荐）
+
+```bash
+curl -fsSL -o poolnext-install.sh https://raw.githubusercontent.com/Qalxry/PoolNeXt/main/scripts/poolnext-install.sh
+bash poolnext-install.sh install
+```
+
+脚本会自动完成：
+
+- 自动识别 `linux/amd64` 与 `linux/arm64`，下载最新 Release 二进制
+- 首次运行自动生成并持久化强 `SESSION_SECRET`（已有则复用）
+- 检测到 systemd 时注册为系统服务，否则用 nohup 后台运行
+- 数据文件（数据库、日志、上传）与二进制同目录，位于 `$HOME/poolnext/`
+
+安装后访问 `http://IP:3000/`，用户名 `root`，一次性密码在首次启动日志中：
+
+- systemd 模式：`journalctl -u poolnext -n 60 | grep '一次性密码'`
+- nohup 模式：`grep '一次性密码' ~/poolnext/poolnext.log`
+
+随时更新到最新版：
+
+```bash
+bash poolnext-install.sh update
+```
+
+可用环境变量：`POOLNEXT_HOME`（安装目录，默认 `$HOME/poolnext`）、`POOLNEXT_PORT`（默认 `3000`）、`POOLNEXT_REPO`（GitHub 仓库，默认 `Qalxry/PoolNeXt`）。下载遵循 `https_proxy`/`http_proxy`。
 
 ### Docker 部署
 
@@ -117,7 +144,7 @@ SQLITE_PATH=/path/to/poolx.db \
 * 用户名：`root`
 * 密码：首次启动时打印在服务 stdout 的随机一次性密码
 
-密码只显示这一次，不会写入任何文件；首次登录后强制要求修改密码。若遗忘密码，停止服务后运行 `poolnext-server --reset-password` 交互式重置。生产模式会拒绝缺失、弱值或占位值 `SESSION_SECRET`。
+密码只显示这一次，不会写入任何文件；首次登录后强制要求修改密码。若遗忘密码，停止服务后运行 `poolnext-server --reset-password` 交互式重置。生产模式会拒绝缺失、弱值或占位值 `SESSION_SECRET`。Linux 下一键安装脚本（`scripts/poolnext-install.sh`）会自动处理密钥生成。
 
 
 ## 配置说明

@@ -68,7 +68,32 @@ This project provides a clean and user-friendly UI for efficiently managing and 
 
 Login URL: `http://IP:3000/`  
 Username: `root`  
-Password: the one-time random value printed to the server stdout on first startup (with Docker, `docker logs poolnext`). You will be required to change it after the first sign-in.
+Password: the one-time random value printed to the server stdout on first startup. You will be required to change it after the first sign-in.
+
+### One-command Install (Linux, recommended)
+
+```bash
+curl -fsSL -o poolnext-install.sh https://raw.githubusercontent.com/Qalxry/PoolNeXt/main/scripts/poolnext-install.sh
+bash poolnext-install.sh install
+```
+
+The script automatically:
+- Detects `linux/amd64` and `linux/arm64` and downloads the latest release binary
+- Generates and persists a strong `SESSION_SECRET` on first run (or reuses an existing one)
+- Registers a `systemd` service when available, otherwise runs in the background with `nohup`
+- Keeps data files (database, logs, uploads) next to the binary in `$HOME/poolnext/`
+
+After install, sign in at `http://IP:3000/` with `root` and the one-time password from the first-start log:
+- systemd: `journalctl -u poolnext -n 60 | grep '一次性密码'`
+- nohup mode: `grep '一次性密码' ~/poolnext/poolnext.log`
+
+Update to the latest release at any time:
+
+```bash
+bash poolnext-install.sh update
+```
+
+Environment variables: `POOLNEXT_HOME` (install dir, default `$HOME/poolnext`), `POOLNEXT_PORT` (default `3000`), `POOLNEXT_REPO` (GitHub repo, default `Qalxry/PoolNeXt`). Downloads honor `https_proxy`/`http_proxy`.
 
 ### Docker Deployment
 
@@ -128,7 +153,7 @@ Initial credentials:
 * Username: `root`
 * Password: the random one-time value printed to the server stdout on first startup
 
-The password is shown only once and is never written to a file; you must change it after the first sign-in. If you lose it, stop the server and run `poolnext-server --reset-password` to reset it interactively. Production startup rejects missing, weak, or placeholder `SESSION_SECRET` values.
+The password is shown only once and is never written to a file; you must change it after the first sign-in. If you lose it, stop the server and run `poolnext-server --reset-password` to reset it interactively. Production startup rejects missing, weak, or placeholder `SESSION_SECRET` values. On Linux, the install script (`scripts/poolnext-install.sh`) handles secret generation for you.
 
 
 ## Configuration
