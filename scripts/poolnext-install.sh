@@ -104,9 +104,18 @@ ensure_secret() {
     SESSION_SECRET="$secret"
 }
 
-# systemd 可用则注册服务，否则 nohup 后台运行
+# 判断 systemd 是否可用：degraded（有失败单元）时也能正常管理服务
+systemd_available() {
+    command -v systemctl >/dev/null 2>&1 || return 1
+    local state
+    state="$(systemctl is-system-running 2>/dev/null || true)"
+    [[ "$state" == "running" || "$state" == "degraded" ]]
+}
+
+# systemd 可用则注册服务（以当前用户运行 + 加固），否则 nohup 后台运行
 ensure_service() {
-    if command -v systemctl >/dev/null 2>&1 && systemctl is-system-running >/dev/null 2>&1; then
+    if systemd_available; then
+        mkdir -p "$HOME_DIR" "$DATA_DIR"
         cat > "/tmp/$SERVICE_NAME.service" <<EOF
 [Unit]
 Description=PoolNeXt Proxy Pool Control Plane
@@ -114,11 +123,14 @@ After=network.target
 
 [Service]
 Type=simple
+User=$USER
 ExecStart=$BINARY_PATH --port $PORT --log-dir $DATA_DIR
 Environment=SESSION_SECRET=$SESSION_SECRET
 WorkingDirectory=$HOME_DIR
 Restart=on-failure
 RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
@@ -126,7 +138,7 @@ EOF
         sudo install -m 0644 "/tmp/$SERVICE_NAME.service" "/etc/systemd/system/$SERVICE_NAME.service"
         sudo systemctl daemon-reload
         sudo systemctl enable "$SERVICE_NAME" --now
-        log "已通过 systemd 启动服务（$SERVICE_NAME）"
+        log "已通过 systemd 启动服务（$SERVICE_NAME，用户 $USER）"
     else
         log "未检测到 systemd，使用 nohup 后台运行"
         cd "$HOME_DIR"
@@ -150,7 +162,7 @@ install() {
     # 兼容两种版本行为：新版二进制 stdout 打印；旧版（v1.0.0）写 bootstrap 文件
     if [[ -f "$HOME_DIR/poolnext-bootstrap.txt" ]]; then
         log "首次登录一次性密码: cat $HOME_DIR/poolnext-bootstrap.txt"
-    elif command -v systemctl >/dev/null 2>&1 && systemctl is-system-running >/dev/null 2>&1; then
+    elif systemd_available; then
         log "首次登录一次性密码: journalctl -u $SERVICE_NAME -n 60 | grep '一次性密码'"
     else
         log "首次登录一次性密码: grep '一次性密码' $HOME_DIR/poolnext.log"
@@ -169,6 +181,12 @@ update() {
         latest_version=$(curl -fsSL "$GITHUB_API/repos/$REPO/releases/latest" | jq -r '.tag_name')
         if [[ "$current" == "$latest_version" ]]; then
             log "已是最新版 ($current)，无需更新"
+            # 若此前以 nohup 安装、现在系统启用了 systemd，则补注册服务
+            if systemd_available && ! systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1; then
+                log "检测到 systemd 且服务未注册，正在注册并接管"
+                ensure_secret
+                ensure_service
+            fi
             return 0
         fi
         log "发现新版本: $current -> $latest_version"
