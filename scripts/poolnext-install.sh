@@ -167,6 +167,8 @@ install() {
     else
         log "首次登录一次性密码: grep '一次性密码' $HOME_DIR/poolnext.log"
     fi
+    log "WebUI 访问地址: http://<本机IP>:${PORT}/ （用户名 root，密码见上方）"
+    log "本机直接访问: http://127.0.0.1:${PORT}/"
 }
 
 # 更新：比较当前版本与最新版本，需要更新才执行
