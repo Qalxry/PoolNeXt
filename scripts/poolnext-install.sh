@@ -344,10 +344,19 @@ update() {
         fi
         log "更新到指定版本: $current -> $target"
     fi
+    # 检测到新版本，提示确认
+    log "是否继续更新? [y/N]"
+    read -r answer
+    case "$answer" in
+        y|Y|yes|YES) : ;;
+        *) log "已取消更新"; return 0 ;;
+    esac
     resolve_download_url "$latest_version"
+    # 先停服务，避免替换二进制时 nohup 产生双进程
+    stop
     install_binary
     ensure_secret
-    ensure_service
+    start
     log "更新完成: $latest_version"
 }
 
