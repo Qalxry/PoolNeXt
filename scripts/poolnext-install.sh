@@ -6,6 +6,7 @@
 #   ./poolnext-install.sh update                 # 更新到最新版
 #   ./poolnext-install.sh update v1.0.1          # 更新到指定版本
 #   ./poolnext-install.sh uninstall              # 卸载（停服务、删单元、删目录）
+#   ./poolnext-install.sh status                 # 查看服务状态与 WebUI 地址
 #
 # 环境变量:
 #   POOLNEXT_HOME   安装目录（默认 $HOME/poolnext）
@@ -220,6 +221,37 @@ install() {
     log "本机直接访问: http://127.0.0.1:${PORT}/"
 }
 
+# 状态：输出服务状态与 WebUI 访问地址
+status() {
+    local state="未知" pid="" port="$PORT" url=""
+    if systemd_available && systemctl list-unit-files "$SERVICE_NAME.service" >/dev/null 2>&1; then
+        state="$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || echo inactive)"
+        pid="$(systemctl show -p MainPID --value "$SERVICE_NAME" 2>/dev/null)"
+        # 从 systemd 单元解析实际监听端口（可能已被递增探测固定）
+        local exec_start
+        exec_start="$(systemctl show -p ExecStart --value "$SERVICE_NAME" 2>/dev/null)"
+        if [[ "$exec_start" =~ --port[[:space:]]+([0-9]+) ]]; then
+            port="${BASH_REMATCH[1]}"
+        fi
+    elif [[ -f "$BINARY_PATH" ]]; then
+        if pid="$(pgrep -f "$BINARY_PATH" 2>/dev/null | head -n1)"; then
+            state="running"
+        else
+            state="stopped"
+        fi
+    fi
+    url="http://127.0.0.1:${port}/"
+    log "服务: $SERVICE_NAME"
+    log "状态: $state"
+    [[ -n "$pid" && "$pid" != "0" ]] && log "PID: $pid"
+    log "二进制: $BINARY_PATH"
+    if [[ -x "$BINARY_PATH" ]]; then
+        log "版本: $("$BINARY_PATH" --version 2>/dev/null || echo unknown)"
+    fi
+    log "本机访问: $url"
+    log "WebUI 访问: http://<本机IP>:${port}/ （用户名 root）"
+}
+
 # 卸载：停服务、移除 systemd 单元、删除部署目录
 uninstall() {
     if systemd_available && systemctl list-unit-files "$SERVICE_NAME.service" >/dev/null 2>&1; then
@@ -278,7 +310,8 @@ main() {
         install)   install ;;
         update)    update "${2:-latest}" ;;
         uninstall) uninstall ;;
-        *) die "用法: $0 {install|update [版本]|uninstall}" ;;
+        status)    status ;;
+        *) die "用法: $0 {install|update [版本]|uninstall|status}" ;;
     esac
 }
 
