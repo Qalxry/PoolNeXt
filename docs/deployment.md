@@ -68,7 +68,7 @@ cd server
 go run -tags embedassets -trimpath -buildvcs=false .
 ```
 
-默认监听 `3000` 端口。
+默认监听 `17778` 端口。
 
 缺失任一前端产物时，`embedassets` 编译会直接失败。旧的 `server/cmd/server` 重复入口已删除，避免 fresh checkout 在运行期才因找不到磁盘资产而崩溃。
 
@@ -116,7 +116,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      - "17778:17778"
     environment:
       SESSION_SECRET: ${SESSION_SECRET:?请先设置高强度 SESSION_SECRET}
       SQLITE_PATH: /data/poolnext.db
@@ -148,7 +148,7 @@ docker compose up -d
 
 ## 3. 首次登录
 
-访问 `http://localhost:3000`
+访问 `http://localhost:17778`
 
 初始账号：
 
@@ -159,7 +159,7 @@ docker compose up -d
 
 如需打开内置 Clash 控制台，可在运行状态页点击“打开 Clash 控制台”，或直接访问：
 
-`http://localhost:3000/zashboard/`
+`http://localhost:17778/zashboard/`
 
 该界面会通过 PoolNeXt 服务端的受限同源代理连接 Mihomo controller，继续复用管理端登录态，不需要在浏览器中填写 `secret`。升级、重启、配置替换和 GEO/UI 更新等危险 controller 路由不会开放。
 
@@ -167,7 +167,7 @@ docker compose up -d
 
 登录管理端后访问：
 
-`http://localhost:3000/swagger/index.html`
+`http://localhost:17778/swagger/index.html`
 
 如需重新生成文档：
 

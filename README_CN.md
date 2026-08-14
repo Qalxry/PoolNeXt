@@ -55,7 +55,7 @@
 
 ## 快速开始
 
-Login URL: `http://IP:3000/`
+Login URL: `http://IP:17778/`
 Username: `root`
 Password: 首次启动时打印在服务 stdout 的随机一次性密码。首次登录后强制要求修改密码。
 
@@ -73,7 +73,7 @@ bash poolnext-install.sh install
 - 检测到 systemd 时注册为系统服务，否则用 nohup 后台运行
 - 数据文件（数据库、日志、上传）与二进制同目录，位于 `$HOME/poolnext/`
 
-安装后访问 `http://IP:3000/`，用户名 `root`。脚本安装完成时会提示一次性密码的查看方式（不同版本行为略有差异，以脚本提示为准）。首次登录后强制要求修改密码。
+安装后访问 `http://IP:17778/`，用户名 `root`。脚本安装完成时会提示一次性密码的查看方式（不同版本行为略有差异，以脚本提示为准）。首次登录后强制要求修改密码。
 
 随时更新到最新版：
 
@@ -81,7 +81,7 @@ bash poolnext-install.sh install
 bash poolnext-install.sh update
 ```
 
-可用环境变量：`POOLNEXT_HOME`（安装目录，默认 `$HOME/poolnext`）、`POOLNEXT_PORT`（默认 `3000`）、`POOLNEXT_REPO`（GitHub 仓库，默认 `Qalxry/PoolNeXt`）。下载遵循 `https_proxy`/`http_proxy`。
+可用环境变量：`POOLNEXT_HOME`（安装目录，默认 `$HOME/poolnext`）、`POOLNEXT_PORT`（默认 `17778`；端口被占用时脚本会向上递增探测空闲端口并固定）、`POOLNEXT_REPO`（GitHub 仓库，默认 `Qalxry/PoolNeXt`）。下载遵循 `https_proxy`/`http_proxy`。
 
 ### Docker 部署
 
@@ -109,7 +109,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      - "17778:17778"
 #     开放代理监听端口
     environment:
       SESSION_SECRET: ${SESSION_SECRET:?请先设置高强度 SESSION_SECRET}
@@ -134,7 +134,7 @@ SQLITE_PATH=/path/to/poolx.db \
 ./poolnext-server
 ```
 
-访问地址：`http://localhost:3000`
+访问地址：`http://localhost:17778`
 
 初始账号：
 

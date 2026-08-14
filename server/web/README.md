@@ -33,7 +33,7 @@ pnpm build
 - `pnpm build` 会先生成 `out/`，随后自动复制为 Go Server 兼容的 `build/` 目录。
 - 默认 API Base URL 为 `/api`，如需覆盖可在构建时设置 `NEXT_PUBLIC_API_BASE_URL`。
 - 构建版本号可通过 `NEXT_PUBLIC_APP_VERSION` 注入，例如 `NEXT_PUBLIC_APP_VERSION=v0.4.0 pnpm build`。
-- `pnpm dev` 会以开发模式启动 `http://127.0.0.1:3001`，并通过同源代理把 `/api/*` 的 HTTP 与 WebSocket 请求统一转发到 `NEXT_DEV_BACKEND_URL`，默认是 `http://127.0.0.1:3000`。
+- `pnpm dev` 会以开发模式启动 `http://127.0.0.1:3001`，并通过同源代理把 `/api/*` 的 HTTP 与 WebSocket 请求统一转发到 `NEXT_DEV_BACKEND_URL`，默认是 `http://127.0.0.1:17778`。
 - `pnpm start` 用于启动已构建产物，对应 Next 生产模式。
 
 ## 开源协议

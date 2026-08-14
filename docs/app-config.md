@@ -25,12 +25,12 @@ SESSION_SECRET="$(openssl rand -hex 32)" make run
 ```bash
 make build-assets
 cd server
-SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -buildvcs=false . --port 3000 --log-dir ./logs
+SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -buildvcs=false . --port 17778 --log-dir ./logs
 ```
 
 | 参数 | 作用 | 默认值 |
 | --- | --- | --- |
-| `--port` | 指定 Server 监听端口 | `3000` |
+| `--port` | 指定 Server 监听端口 | `17778` |
 | `--log-dir` | 指定日志目录 | 空 |
 | `--version` | 输出当前版本后退出 | `false` |
 | `--reset-password` | 交互式重置管理员密码后退出（不启动服务） | `false` |
@@ -40,7 +40,7 @@ SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -bui
 
 | 环境变量 | 作用 | 默认值 |
 | --- | --- | --- |
-| `PORT` | Server 监听端口 | `3000` |
+| `PORT` | Server 监听端口 | `17778` |
 | `GIN_MODE` | Gin 运行模式 | 非 `debug` 时按 release |
 | `LOG_LEVEL` | 日志等级 | `info` |
 | `SESSION_SECRET` | Session 签名密钥；生产模式至少 32 字节且不能是占位值 | 无，生产必填 |
@@ -123,7 +123,7 @@ SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -bui
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | 前端请求 API 的基础路径 | `/api` |
 | `NEXT_PUBLIC_APP_VERSION` | 前端展示版本号 | `dev` |
-| `NEXT_DEV_BACKEND_URL` | 本地开发代理到后端的地址 | `http://127.0.0.1:3000` |
+| `NEXT_DEV_BACKEND_URL` | 本地开发代理到后端的地址 | `http://127.0.0.1:17778` |
 
 生产构建还显式传递 `NEXT_BUILD_ID` 和 `ZASHBOARD_COMMIT_ID`。Make、Release 与 Docker 使用同一 `VERSION`/`COMMIT` 输入，并统一启用 Go `-buildvcs=false`，避免构建环境是否包含 `.git` 改变制品内容。
 

@@ -31,7 +31,7 @@ python3 scripts/audit/collect_baseline.py api \
   --output /tmp/poolnext-run/metrics.jsonl \
   --run-id p0-api-50638db \
   --scenario runtime-status \
-  --url http://127.0.0.1:3000/api/runtime \
+  --url http://127.0.0.1:17778/api/runtime \
   --requests 100
 
 python3 scripts/audit/collect_baseline.py disk \
@@ -51,7 +51,7 @@ After installing the locked `server/web` dependencies and Playwright Chromium:
 
 ```bash
 node scripts/audit/capture_dom.mjs \
-  --url http://127.0.0.1:3000/nodes \
+  --url http://127.0.0.1:17778/nodes \
   --run-id p6-nodes-10k \
   --scenario nodes-10k-desktop \
   --viewport 1440x900 \
