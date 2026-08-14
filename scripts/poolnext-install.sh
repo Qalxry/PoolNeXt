@@ -162,10 +162,28 @@ install() {
     # 兼容两种版本行为：新版二进制 stdout 打印；旧版（v1.0.0）写 bootstrap 文件
     if [[ -f "$HOME_DIR/poolnext-bootstrap.txt" ]]; then
         log "首次登录一次性密码: cat $HOME_DIR/poolnext-bootstrap.txt"
-    elif systemd_available; then
-        log "首次登录一次性密码: journalctl -u $SERVICE_NAME -n 60 | grep '一次性密码'"
     else
-        log "首次登录一次性密码: grep '一次性密码' $HOME_DIR/poolnext.log"
+        local password=""
+        local attempt
+        for attempt in {1..30}; do
+            if systemd_available; then
+                password="$(journalctl -u "$SERVICE_NAME" --since "1 min ago" --no-pager 2>/dev/null | sed -n 's/.*一次性密码: \([^ ]*\).*/\1/p' | tail -n1)"
+            else
+                password="$(sed -n 's/.*一次性密码: \([^ ]*\).*/\1/p' "$HOME_DIR/poolnext.log" 2>/dev/null | tail -n1)"
+            fi
+            [[ -n "$password" ]] && break
+            sleep 1
+        done
+        if [[ -n "$password" ]]; then
+            log "用户名: root"
+            log "首次登录一次性密码: $password"
+        else
+            if systemd_available; then
+                log "首次登录一次性密码: journalctl -u $SERVICE_NAME -n 60 | grep '一次性密码'"
+            else
+                log "首次登录一次性密码: grep '一次性密码' $HOME_DIR/poolnext.log"
+            fi
+        fi
     fi
     log "WebUI 访问地址: http://<本机IP>:${PORT}/ （用户名 root，密码见上方）"
     log "本机直接访问: http://127.0.0.1:${PORT}/"
