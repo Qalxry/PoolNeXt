@@ -7,6 +7,7 @@
 #   ./poolnext-install.sh update v1.0.1          # 更新到指定版本
 #   ./poolnext-install.sh uninstall              # 卸载（停服务、删单元、删目录）
 #   ./poolnext-install.sh status                 # 查看服务状态与 WebUI 地址
+#   ./poolnext-install.sh start|stop|restart     # 启动/停止/重启服务
 #
 # 环境变量:
 #   POOLNEXT_HOME   安装目录（默认 $HOME/poolnext）
@@ -252,6 +253,51 @@ status() {
     log "WebUI 访问: http://<本机IP>:${port}/ （用户名 root）"
 }
 
+# 启动服务：systemd 优先，否则 nohup 后台
+start() {
+    if systemd_available && systemctl list-unit-files "$SERVICE_NAME.service" >/dev/null 2>&1; then
+        sudo systemctl start "$SERVICE_NAME"
+        log "已启动 systemd 服务（$SERVICE_NAME）"
+    else
+        if [[ ! -x "$BINARY_PATH" ]]; then
+            die "未安装二进制，请先运行 install"
+        fi
+        if pgrep -f "$BINARY_PATH" >/dev/null 2>&1; then
+            log "服务已在运行"
+            return 0
+        fi
+        ensure_secret
+        cd "$HOME_DIR"
+        SESSION_SECRET="$SESSION_SECRET" nohup "$BINARY_PATH" --port "$PORT" --log-dir "$DATA_DIR" \
+            >> "$HOME_DIR/poolnext.log" 2>&1 &
+        log "已启动，PID: $!，日志: $HOME_DIR/poolnext.log"
+    fi
+}
+
+# 停止服务：systemd 优先，否则按 PID 终止
+stop() {
+    if systemd_available && systemctl list-unit-files "$SERVICE_NAME.service" >/dev/null 2>&1; then
+        sudo systemctl stop "$SERVICE_NAME"
+        log "已停止 systemd 服务（$SERVICE_NAME）"
+    else
+        local pid
+        if pid="$(pgrep -f "$BINARY_PATH" 2>/dev/null | head -n1)"; then
+            kill "$pid"
+            log "已停止进程（PID: $pid）"
+        else
+            log "服务未在运行"
+        fi
+    fi
+}
+
+# 重启服务
+restart() {
+    stop
+    sleep 1
+    start
+    log "服务已重启"
+}
+
 # 卸载：停服务、移除 systemd 单元、删除部署目录
 uninstall() {
     if systemd_available && systemctl list-unit-files "$SERVICE_NAME.service" >/dev/null 2>&1; then
@@ -311,7 +357,10 @@ main() {
         update)    update "${2:-latest}" ;;
         uninstall) uninstall ;;
         status)    status ;;
-        *) die "用法: $0 {install|update [版本]|uninstall|status}" ;;
+        start)     start ;;
+        stop)      stop ;;
+        restart)   restart ;;
+        *) die "用法: $0 {install|update [版本]|uninstall|status|start|stop|restart}" ;;
     esac
 }
 
