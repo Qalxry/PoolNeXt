@@ -6,7 +6,7 @@ import next from 'next';
 const port = Number.parseInt(process.env.PORT ?? '3001', 10);
 const hostname = process.env.HOSTNAME || '127.0.0.1';
 const backendBaseUrl = new URL(
-  (process.env.NEXT_DEV_BACKEND_URL || 'http://127.0.0.1:3000').replace(
+  (process.env.NEXT_DEV_BACKEND_URL || 'http://127.0.0.1:17778').replace(
     /\/+$/,
     '',
   ),

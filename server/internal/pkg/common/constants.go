@@ -23,7 +23,7 @@ const DefaultClashMode = "rule"
 const DefaultClashSecret = "3ebc195c9fbe81c01eb9299e3c6bf644"
 
 var SystemName = "PoolNeXt"
-var ServerAddress = "http://localhost:3000"
+var ServerAddress = "http://localhost:17778"
 var ServerUpdateRepo = DefaultServerUpdateRepo
 var KernelType = DefaultKernelType
 var MihomoBinaryPath = ""

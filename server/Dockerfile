@@ -58,7 +58,7 @@ RUN apk add --no-cache ca-certificates tzdata && \
     adduser -S -D -H -u 10001 -G poolnext poolnext && \
     install -d -o poolnext -g poolnext -m 0750 /data
 
-ENV PORT=3000 \
+ENV PORT=17778 \
     GIN_MODE=release \
     SQLITE_PATH=/data/poolnext.db \
     UPLOAD_PATH=/data/upload \
@@ -66,8 +66,8 @@ ENV PORT=3000 \
 COPY --from=server-builder --chown=root:root /out/poolnext-server /usr/local/bin/poolnext-server
 USER 10001:10001
 WORKDIR /data
-EXPOSE 3000
+EXPOSE 17778
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
-  CMD wget -q -O /dev/null http://127.0.0.1:3000/api/status || exit 1
+  CMD wget -q -O /dev/null http://127.0.0.1:17778/api/status || exit 1
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/usr/local/bin/poolnext-server"]

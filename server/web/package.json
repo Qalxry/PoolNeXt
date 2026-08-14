@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.6.2",
   "scripts": {
-    "dev": "NEXT_DEV_BACKEND_URL=${NEXT_DEV_BACKEND_URL:-http://127.0.0.1:3000} node scripts/dev-server.mjs",
+    "dev": "NEXT_DEV_BACKEND_URL=${NEXT_DEV_BACKEND_URL:-http://127.0.0.1:17778} node scripts/dev-server.mjs",
     "clean": "node scripts/clean-build-output.mjs",
     "build": "next build",
     "build:embedded": "pnpm run clean && pnpm run build",

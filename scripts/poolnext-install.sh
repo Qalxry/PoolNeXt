@@ -10,7 +10,7 @@
 # 环境变量:
 #   POOLNEXT_HOME   安装目录（默认 $HOME/poolnext）
 #   POOLNEXT_REPO   GitHub 仓库（默认 Qalxry/PoolNeXt）
-#   POOLNEXT_PORT   监听端口（默认 3000）
+#   POOLNEXT_PORT   监听端口（默认 17778）
 #
 # 行为:
 #   - 自动识别 linux/amd64、linux/arm64
@@ -25,7 +25,7 @@ set -euo pipefail
 
 HOME_DIR="${POOLNEXT_HOME:-$HOME/poolnext}"
 REPO="${POOLNEXT_REPO:-Qalxry/PoolNeXt}"
-PORT="${POOLNEXT_PORT:-3000}"
+PORT="${POOLNEXT_PORT:-17778}"
 BINARY_NAME="poolnext-server"
 BINARY_PATH="$HOME_DIR/$BINARY_NAME"
 SERVICE_NAME="poolnext"
@@ -105,6 +105,34 @@ ensure_secret() {
     SESSION_SECRET="$secret"
 }
 
+# 端口占用检测：ss 或 /proc/net/tcp 都可用
+port_in_use() {
+    local port="$1"
+    if command -v ss >/dev/null 2>&1; then
+        ss -tln | awk '{print $4}' | grep -q ":${port}$"
+    else
+        grep -q "0A" /proc/net/tcp 2>/dev/null && awk '{print $2}' /proc/net/tcp 2>/dev/null | grep -q "$(printf '%04X' "$port")"
+    fi
+}
+
+# 端口冲突递增探测并固定：若默认端口被占用，逐个递增找空闲端口
+# （systemd 场景：端口固定，首次确定后不再变化）
+resolve_port() {
+    local candidate="$PORT" max=20
+    if port_in_use "$candidate"; then
+        local n
+        for ((n = 0; n < max; n++)); do
+            candidate=$((PORT + n + 1))
+            if ! port_in_use "$candidate"; then
+                warn "端口 $PORT 被占用，改用 $candidate"
+                PORT="$candidate"
+                return 0
+            fi
+        done
+        die "端口 $PORT 至 $((PORT + max)) 均被占用，请设置 POOLNEXT_PORT"
+    fi
+}
+
 # 判断 systemd 是否可用：degraded（有失败单元）时也能正常管理服务
 systemd_available() {
     command -v systemctl >/dev/null 2>&1 || return 1
@@ -155,6 +183,8 @@ install() {
         warn "已存在 $BINARY_PATH，将覆盖为最新版"
     fi
     mkdir -p "$HOME_DIR" "$DATA_DIR"
+    # systemd 场景端口固定，先探测冲突避免绑定失败
+    systemd_available && resolve_port
     resolve_download_url "latest"
     install_binary
     ensure_secret

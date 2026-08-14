@@ -66,7 +66,7 @@ This project provides a clean and user-friendly UI for efficiently managing and 
 
 ## Quick Start
 
-Login URL: `http://IP:3000/`  
+Login URL: `http://IP:17778/`
 Username: `root`  
 Password: the one-time random value printed to the server stdout on first startup. You will be required to change it after the first sign-in.
 
@@ -83,7 +83,7 @@ The script automatically:
 - Registers a `systemd` service when available, otherwise runs in the background with `nohup`
 - Keeps data files (database, logs, uploads) next to the binary in `$HOME/poolnext/`
 
-After install, sign in at `http://IP:3000/` with `root`. The script prints how to obtain the one-time password (the exact location depends on the release behavior; follow the script's hint). You will be required to change the password after the first sign-in.
+After install, sign in at `http://IP:17778/` with `root`. The script prints how to obtain the one-time password (the exact location depends on the release behavior; follow the script's hint). You will be required to change the password after the first sign-in.
 
 Update to the latest release at any time:
 
@@ -91,7 +91,7 @@ Update to the latest release at any time:
 bash poolnext-install.sh update
 ```
 
-Environment variables: `POOLNEXT_HOME` (install dir, default `$HOME/poolnext`), `POOLNEXT_PORT` (default `3000`), `POOLNEXT_REPO` (GitHub repo, default `Qalxry/PoolNeXt`). Downloads honor `https_proxy`/`http_proxy`.
+Environment variables: `POOLNEXT_HOME` (install dir, default `$HOME/poolnext`), `POOLNEXT_PORT` (default `17778`; when the port is already in use the script probes upward for a free one and fixes it), `POOLNEXT_REPO` (GitHub repo, default `Qalxry/PoolNeXt`). Downloads honor `https_proxy`/`http_proxy`.
 
 ### Docker Deployment
 
@@ -119,7 +119,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      - "17778:17778"
 #     Expose proxy listening ports as needed
     environment:
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET to a strong random value}
@@ -145,7 +145,7 @@ SQLITE_PATH=/path/to/poolx.db \
 ./poolnext-server
 ```
 
-Access URL: http://localhost:3000
+Access URL: http://localhost:17778
 
 Initial credentials:
 * Username: `root`

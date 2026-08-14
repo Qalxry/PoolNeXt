@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	Port          = flag.Int("port", 3000, "the listening port")
+	Port          = flag.Int("port", 17778, "the listening port")
 	PrintVersion  = flag.Bool("version", false, "print version and exit")
 	PrintHelp     = flag.Bool("help", false, "print help and exit")
 	ResetPassword = flag.Bool("reset-password", false, "interactively reset the admin password and exit")

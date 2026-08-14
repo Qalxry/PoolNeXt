@@ -27,7 +27,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      - "17778:17778"
     environment:
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET to a strong random value before starting Compose}
       POOLNEXT_BOOTSTRAP_FILE: /data/poolnext-bootstrap.txt

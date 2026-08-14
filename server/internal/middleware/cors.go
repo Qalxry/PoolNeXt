@@ -54,6 +54,6 @@ func SecurityHeaders() gin.HandlerFunc {
 
 func CORS() gin.HandlerFunc {
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:3000"}
+	config.AllowOrigins = []string{"http://localhost:17778"}
 	return cors.New(config)
 }

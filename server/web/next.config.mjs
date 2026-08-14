@@ -1,6 +1,6 @@
 const devBackendUrl =
   process.env.NEXT_DEV_BACKEND_URL?.replace(/\/+$/, '') ||
-  'http://127.0.0.1:3000';
+  'http://127.0.0.1:17778';
 const enableDevProxy = process.env.NEXT_DEV_PROXY === 'true';
 const buildId = (
   process.env.NEXT_BUILD_ID ||
