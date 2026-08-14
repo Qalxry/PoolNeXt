@@ -272,6 +272,7 @@ start() {
             >> "$HOME_DIR/poolnext.log" 2>&1 &
         log "已启动，PID: $!，日志: $HOME_DIR/poolnext.log"
     fi
+    status
 }
 
 # 停止服务：systemd 优先，否则按 PID 终止
@@ -290,12 +291,11 @@ stop() {
     fi
 }
 
-# 重启服务
+# 重启服务（start 内部会打印 status）
 restart() {
     stop
     sleep 1
     start
-    log "服务已重启"
 }
 
 # 卸载：停服务、移除 systemd 单元、删除部署目录
