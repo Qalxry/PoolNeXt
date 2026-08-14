@@ -5,6 +5,7 @@
 #   ./poolnext-install.sh install                # 首次安装
 #   ./poolnext-install.sh update                 # 更新到最新版
 #   ./poolnext-install.sh update v1.0.1          # 更新到指定版本
+#   ./poolnext-install.sh uninstall              # 卸载（停服务、删单元、删目录）
 #
 # 环境变量:
 #   POOLNEXT_HOME   安装目录（默认 $HOME/poolnext）
@@ -189,6 +190,23 @@ install() {
     log "本机直接访问: http://127.0.0.1:${PORT}/"
 }
 
+# 卸载：停服务、移除 systemd 单元、删除部署目录
+uninstall() {
+    if systemd_available && systemctl list-unit-files "$SERVICE_NAME.service" >/dev/null 2>&1; then
+        log "正在停止并移除 systemd 服务（$SERVICE_NAME）..."
+        sudo systemctl disable --now "$SERVICE_NAME" || warn "停用服务失败，请检查权限"
+        sudo rm -f "/etc/systemd/system/$SERVICE_NAME.service"
+        sudo systemctl daemon-reload
+    fi
+    if [[ -d "$HOME_DIR" ]]; then
+        log "正在删除部署目录: $HOME_DIR"
+        rm -rf "$HOME_DIR"
+    else
+        warn "未找到部署目录: $HOME_DIR（可能已删除）"
+    fi
+    log "卸载完成。数据（数据库、日志、上传）已随目录一并删除。"
+}
+
 # 更新：比较当前版本与最新版本，需要更新才执行
 update() {
     local target="${1:-latest}" current latest_version
@@ -227,9 +245,10 @@ update() {
 
 main() {
     case "${1:-}" in
-        install) install ;;
-        update)  update "${2:-latest}" ;;
-        *) die "用法: $0 {install|update [版本]}" ;;
+        install)   install ;;
+        update)    update "${2:-latest}" ;;
+        uninstall) uninstall ;;
+        *) die "用法: $0 {install|update [版本]|uninstall}" ;;
     esac
 }
 
