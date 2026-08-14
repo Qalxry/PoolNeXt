@@ -507,7 +507,7 @@ jobs:
           docker volume create "$data_volume" >/dev/null
           docker run --detach \
             --name "$container_name" \
-            --publish 127.0.0.1::3000 \
+            --publish 127.0.0.1::17778 \
             --read-only \
             --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m \
             --cap-drop ALL \
@@ -520,7 +520,7 @@ jobs:
             --volume "$data_volume:/data" \
             "poolnext-ci:$GITHUB_SHA" >/dev/null
 
-          address="$(docker port "$container_name" 3000/tcp | head -n1)"
+          address="$(docker port "$container_name" 17778/tcp | head -n1)"
           for attempt in {1..60}; do
             health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$container_name")"
             if [[ "$health" == "healthy" ]] && curl --fail --silent "http://$address/api/status" >/tmp/poolnext-status.json; then
