@@ -179,8 +179,11 @@ export function RuntimePage() {
       setFeedback({ tone: 'success', message: 'Mihomo 已停止。' });
       await queryClient.invalidateQueries({ queryKey: runtimeStatusQueryKey });
     },
-    onError: (error) => {
+    onError: async (error) => {
       setFeedback({ tone: 'danger', message: getErrorMessage(error) });
+      // A stale PID is cleared by the backend before it reports the safety
+      // refusal. Refresh immediately so the user can start the runtime again.
+      await queryClient.invalidateQueries({ queryKey: runtimeStatusQueryKey });
     },
   });
 
@@ -197,6 +200,7 @@ export function RuntimePage() {
 
   const status = statusQuery.data;
   const capability = capabilityQuery.data;
+  const hasStalePID = Boolean(status?.instance.pid) && !status?.running;
   const listenerSummary = useMemo(
     () => status?.listeners ?? [],
     [status?.listeners],
@@ -268,10 +272,16 @@ export function RuntimePage() {
                 setFeedback(null);
                 stopMutation.mutate();
               }}
-              disabled={stopMutation.isPending || !status.running}
+              disabled={
+                stopMutation.isPending || (!status.running && !hasStalePID)
+              }
             >
               <Square className="h-3.5 w-3.5" aria-hidden="true" />
-              {stopMutation.isPending ? '停止中...' : '停止'}
+              {stopMutation.isPending
+                ? '处理中...'
+                : hasStalePID
+                  ? '清理历史状态'
+                  : '停止'}
             </DangerButton>
             <SecondaryButton
               type="button"
@@ -294,6 +304,12 @@ export function RuntimePage() {
         <InlineMessage
           tone={capability.binary_exists ? 'info' : 'danger'}
           message={capability.message}
+        />
+      ) : null}
+      {hasStalePID ? (
+        <InlineMessage
+          tone="danger"
+          message={`检测到未由当前 PoolNeXt 进程托管的历史 PID ${status.instance.pid}。请点击“清理历史状态”后再启动。`}
         />
       ) : null}
       {!status.config_valid ? (

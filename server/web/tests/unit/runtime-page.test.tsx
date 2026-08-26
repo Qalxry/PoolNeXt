@@ -106,4 +106,28 @@ describe('RuntimePage', () => {
 
     view.unmount();
   });
+
+  it('keeps stale PID cleanup available after the server restarts', () => {
+    runtimeStatus.running = false;
+    runtimeStatus.instance.status = 'error';
+    runtimeStatus.instance.last_error =
+      '检测到未由当前 PoolNeXt 进程托管的历史 PID 1234';
+
+    const view = render(<RuntimePage />);
+    const cleanupButton = screen.getByRole('button', {
+      name: '清理历史状态',
+    });
+
+    expect(cleanupButton).toBeEnabled();
+    expect(
+      screen.getByText(
+        '检测到未由当前 PoolNeXt 进程托管的历史 PID 1234。请点击“清理历史状态”后再启动。',
+      ),
+    ).toBeInTheDocument();
+
+    view.unmount();
+    runtimeStatus.running = true;
+    runtimeStatus.instance.status = 'running';
+    runtimeStatus.instance.last_error = '';
+  });
 });

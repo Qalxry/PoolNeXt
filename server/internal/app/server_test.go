@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"poolx/internal/model"
+	"poolx/internal/service"
 )
 
 const weakSessionSecretChildEnv = "POOLNEXT_TEST_WEAK_SESSION_SECRET_CHILD"
@@ -329,6 +331,43 @@ func TestNewHTTPServerHasDefensiveTimeouts(t *testing.T) {
 	}
 	if server.BaseContext == nil {
 		t.Fatal("BaseContext must propagate the application context")
+	}
+}
+
+func TestRuntimeNeedsShutdownWhenPersistedPIDExists(t *testing.T) {
+	pid := 2083015
+
+	tests := []struct {
+		name   string
+		status *service.RuntimeStatus
+		want   bool
+	}{
+		{name: "nil status", status: nil, want: false},
+		{
+			name: "stale persisted pid",
+			status: &service.RuntimeStatus{
+				Instance: &model.KernelInstance{PID: &pid},
+			},
+			want: true,
+		},
+		{
+			name:   "managed running process",
+			status: &service.RuntimeStatus{Running: true},
+			want:   true,
+		},
+		{
+			name:   "fully stopped",
+			status: &service.RuntimeStatus{Instance: &model.KernelInstance{}},
+			want:   false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := runtimeNeedsShutdown(test.status); got != test.want {
+				t.Fatalf("runtimeNeedsShutdown() = %t, want %t", got, test.want)
+			}
+		})
 	}
 }
 

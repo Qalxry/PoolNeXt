@@ -198,7 +198,7 @@ func RunServer(assetFS fs.FS, buildDir string, indexPage []byte, zashboardDir st
 	status, statusErr := service.GetRuntimeStatus(runtimeShutdownContext)
 	if statusErr != nil {
 		slog.Warn("read Mihomo runtime status during shutdown failed", "error", statusErr)
-	} else if status.Running {
+	} else if runtimeNeedsShutdown(status) {
 		if _, stopErr := service.StopRuntime(runtimeShutdownContext); stopErr != nil {
 			slog.Warn("stop managed Mihomo runtime during shutdown failed", "error", stopErr)
 		}
@@ -210,6 +210,10 @@ func RunServer(assetFS fs.FS, buildDir string, indexPage []byte, zashboardDir st
 		return
 	}
 	slog.Info("server stopped")
+}
+
+func runtimeNeedsShutdown(status *service.RuntimeStatus) bool {
+	return status != nil && (status.Running || status.Instance != nil && status.Instance.PID != nil)
 }
 
 func newSessionStore(sessionSecret string) (sessions.Store, error) {
