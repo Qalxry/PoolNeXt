@@ -1,7 +1,9 @@
 package service
 
 import (
+	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -54,6 +56,152 @@ func TestSelectMihomoReleaseAssetSkipsPackageFormats(t *testing.T) {
 	if asset.BrowserDownloadURL != "https://example.com/binary" {
 		t.Fatalf("expected gzip binary asset, got %s", asset.BrowserDownloadURL)
 	}
+}
+
+func TestIsSupportedMihomoBinaryAssetAcceptsGzipAndZip(t *testing.T) {
+	supported := []string{
+		"mihomo-linux-amd64-v1.19.32.gz",
+		"mihomo-darwin-arm64-v1.19.32.gz",
+		"mihomo-windows-amd64-v3-v1.19.32.zip",
+		"mihomo-windows-arm64-v1.19.32.zip",
+	}
+	for _, name := range supported {
+		if !isSupportedMihomoBinaryAsset(name) {
+			t.Fatalf("expected %q to be accepted as a kernel asset", name)
+		}
+	}
+
+	unsupported := []string{
+		"mihomo-linux-amd64-v1.19.32.deb",
+		"mihomo-linux-amd64-v1.19.32.rpm",
+		"sha256sum.txt",
+		"mihomo-windows-amd64-v3-v1.19.32.zip.sha256",
+	}
+	for _, name := range unsupported {
+		if isSupportedMihomoBinaryAsset(name) {
+			t.Fatalf("expected %q to be rejected as a kernel asset", name)
+		}
+	}
+}
+
+func TestSelectMihomoReleaseAssetForWindowsPrefersZipBinary(t *testing.T) {
+	assets := []githubAsset{
+		{Name: "mihomo-windows-386-v1.19.32.zip", BrowserDownloadURL: "https://example.com/386"},
+		{Name: "mihomo-windows-amd64-v1.19.32.zip", BrowserDownloadURL: "https://example.com/amd64"},
+		{Name: "mihomo-windows-amd64-v3-v1.19.32.zip", BrowserDownloadURL: "https://example.com/amd64-v3"},
+		{Name: "mihomo-windows-amd64-compatible-v1.19.32.zip", BrowserDownloadURL: "https://example.com/compatible"},
+		{Name: "mihomo-windows-arm64-v1.19.32.zip", BrowserDownloadURL: "https://example.com/arm64"},
+		{Name: "mihomo-linux-amd64-v3-v1.19.32.gz", BrowserDownloadURL: "https://example.com/linux"},
+	}
+
+	asset, err := selectMihomoReleaseAssetFor(assets, "windows", "amd64")
+	if err != nil {
+		t.Fatalf("expected Windows asset selection to succeed: %v", err)
+	}
+	if asset.BrowserDownloadURL != "https://example.com/amd64-v3" {
+		t.Fatalf("expected the amd64-v3 zip asset, got %s", asset.BrowserDownloadURL)
+	}
+
+	arm64Asset, err := selectMihomoReleaseAssetFor(assets, "windows", "arm64")
+	if err != nil {
+		t.Fatalf("expected Windows arm64 asset selection to succeed: %v", err)
+	}
+	if arm64Asset.BrowserDownloadURL != "https://example.com/arm64" {
+		t.Fatalf("expected the arm64 zip asset, got %s", arm64Asset.BrowserDownloadURL)
+	}
+}
+
+func TestPrepareMihomoReleaseBinaryDecompressesGzipAsset(t *testing.T) {
+	content := []byte("fake-linux-mihomo-binary")
+	var compressed bytes.Buffer
+	gzipWriter := gzip.NewWriter(&compressed)
+	if _, err := gzipWriter.Write(content); err != nil {
+		t.Fatalf("write gzip payload: %v", err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatalf("close gzip payload: %v", err)
+	}
+
+	const assetName = "mihomo-linux-amd64-v1.19.32.gz"
+	tempPath, recordedName, err := prepareMihomoReleaseBinary(assetName, bytes.NewReader(compressed.Bytes()), t.TempDir())
+	if err != nil {
+		t.Fatalf("expected gzip asset preparation to succeed: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(tempPath) })
+
+	if recordedName != assetName {
+		t.Fatalf("unexpected recorded file name: %q", recordedName)
+	}
+	installed, err := os.ReadFile(tempPath)
+	if err != nil {
+		t.Fatalf("read prepared binary: %v", err)
+	}
+	if !bytes.Equal(installed, content) {
+		t.Fatalf("unexpected prepared binary content: %q", installed)
+	}
+}
+
+func TestPrepareMihomoReleaseBinaryExtractsZipKernel(t *testing.T) {
+	content := []byte("fake-windows-mihomo-binary")
+	archive := buildTestZipArchive(t, map[string][]byte{
+		"README.md":                   []byte("mihomo release notes"),
+		"mihomo-windows-amd64-v3.exe": content,
+	})
+
+	const assetName = "mihomo-windows-amd64-v3-v1.19.32.zip"
+	tempPath, recordedName, err := prepareMihomoReleaseBinary(assetName, bytes.NewReader(archive), t.TempDir())
+	if err != nil {
+		t.Fatalf("expected zip asset preparation to succeed: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(tempPath) })
+
+	if recordedName != "mihomo-windows-amd64-v3.exe" {
+		t.Fatalf("unexpected recorded file name: %q", recordedName)
+	}
+	if filepath.Ext(tempPath) != ".exe" {
+		t.Fatalf("expected the prepared kernel to keep the .exe suffix, got %q", tempPath)
+	}
+	installed, err := os.ReadFile(tempPath)
+	if err != nil {
+		t.Fatalf("read extracted binary: %v", err)
+	}
+	if !bytes.Equal(installed, content) {
+		t.Fatalf("unexpected extracted binary content: %q", installed)
+	}
+}
+
+func TestPrepareMihomoReleaseBinaryRejectsZipWithoutKernel(t *testing.T) {
+	archive := buildTestZipArchive(t, map[string][]byte{
+		"README.md": []byte("mihomo release notes"),
+	})
+
+	_, _, err := prepareMihomoReleaseBinary("mihomo-windows-amd64-v3-v1.19.32.zip", bytes.NewReader(archive), t.TempDir())
+	if err == nil {
+		t.Fatal("expected a zip without a kernel executable to be rejected")
+	}
+	if !strings.Contains(err.Error(), "未找到内核可执行文件") {
+		t.Fatalf("unexpected rejection reason: %v", err)
+	}
+}
+
+func buildTestZipArchive(t *testing.T, entries map[string][]byte) []byte {
+	t.Helper()
+
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	for name, content := range entries {
+		entryWriter, err := writer.Create(name)
+		if err != nil {
+			t.Fatalf("create zip entry %q: %v", name, err)
+		}
+		if _, err := entryWriter.Write(content); err != nil {
+			t.Fatalf("write zip entry %q: %v", name, err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close zip archive: %v", err)
+	}
+	return archive.Bytes()
 }
 
 func TestInstallUploadedMihomoBinary(t *testing.T) {

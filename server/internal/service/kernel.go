@@ -1,6 +1,7 @@
 package service
 
 import (
+	"archive/zip"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -30,6 +31,14 @@ const (
 	KernelModeExternalImmutable = "external_immutable"
 	KernelModeManaged           = "managed"
 	KernelModeUnknown           = "unknown"
+)
+
+const (
+	// maxMihomoReleaseArchiveBytes bounds the compressed release archive that is
+	// buffered to a temporary file before the kernel binary is extracted from it.
+	maxMihomoReleaseArchiveBytes int64 = 256 << 20
+	// maxMihomoKernelBinaryBytes bounds the extracted kernel binary size.
+	maxMihomoKernelBinaryBytes int64 = 256 << 20
 )
 
 var (
@@ -165,21 +174,110 @@ func downloadAndInstallMihomoBinaryLocked(ctx context.Context, installPath strin
 		return nil, fmt.Errorf("下载 Mihomo 二进制失败: %s", resp.Status)
 	}
 
-	reader := io.Reader(resp.Body)
-	if strings.HasSuffix(strings.ToLower(asset.Name), ".gz") {
-		gzipReader, err := gzip.NewReader(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("解压 Mihomo 发行包失败: %v", err)
-		}
-		defer gzipReader.Close()
-		reader = gzipReader
-	}
-
-	tempPath, err := persistExecutableTempFile(filepath.Dir(resolvedPath), "poolx-mihomo-download-", asset.Name, reader)
+	tempPath, installedFileName, err := prepareMihomoReleaseBinary(asset.Name, resp.Body, filepath.Dir(resolvedPath))
 	if err != nil {
 		return nil, err
 	}
-	return installPreparedMihomoBinary(ctx, tempPath, resolvedPath, asset.Name, MihomoBinarySourceDownload, release.TagName)
+	return installPreparedMihomoBinary(ctx, tempPath, resolvedPath, installedFileName, MihomoBinarySourceDownload, release.TagName)
+}
+
+// prepareMihomoReleaseBinary turns a downloaded release asset body into an executable
+// temporary file and reports the name recorded for the installed binary.
+//
+// Linux/macOS releases publish the raw binary as `.gz`, while Windows releases ship a
+// `.zip` archive that contains the kernel executable next to other files.
+func prepareMihomoReleaseBinary(assetName string, body io.Reader, tempDir string) (string, string, error) {
+	trimmedName := strings.TrimSpace(assetName)
+	switch lowerName := strings.ToLower(trimmedName); {
+	case strings.HasSuffix(lowerName, ".gz"):
+		gzipReader, err := gzip.NewReader(body)
+		if err != nil {
+			return "", "", fmt.Errorf("解压 Mihomo 发行包失败: %v", err)
+		}
+		defer func() { _ = gzipReader.Close() }()
+
+		tempPath, err := persistExecutableTempFile(tempDir, "poolx-mihomo-download-", trimmedName, gzipReader)
+		if err != nil {
+			return "", "", err
+		}
+		return tempPath, trimmedName, nil
+	case strings.HasSuffix(lowerName, ".zip"):
+		return extractMihomoBinaryFromZip(body, tempDir)
+	default:
+		return "", "", fmt.Errorf("不支持的 Mihomo 发行包格式: %s", trimmedName)
+	}
+}
+
+func extractMihomoBinaryFromZip(body io.Reader, tempDir string) (string, string, error) {
+	archiveFile, err := os.CreateTemp(tempDir, "poolx-mihomo-download-*.zip")
+	if err != nil {
+		return "", "", fmt.Errorf("创建 Mihomo 发行包临时文件失败: %v", err)
+	}
+	archivePath := archiveFile.Name()
+	defer func() { _ = os.Remove(archivePath) }()
+
+	written, copyErr := io.Copy(archiveFile, io.LimitReader(body, maxMihomoReleaseArchiveBytes+1))
+	closeErr := archiveFile.Close()
+	if copyErr != nil {
+		return "", "", fmt.Errorf("保存 Mihomo 发行包失败: %v", copyErr)
+	}
+	if closeErr != nil {
+		return "", "", fmt.Errorf("关闭 Mihomo 发行包临时文件失败: %v", closeErr)
+	}
+	if written > maxMihomoReleaseArchiveBytes {
+		return "", "", fmt.Errorf("Mihomo 发行包超过大小上限 %d 字节", maxMihomoReleaseArchiveBytes)
+	}
+
+	archiveReader, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return "", "", fmt.Errorf("解压 Mihomo 发行包失败: %v", err)
+	}
+	defer func() { _ = archiveReader.Close() }()
+
+	entry, err := findMihomoExecutableInZip(archiveReader.File)
+	if err != nil {
+		return "", "", err
+	}
+	if entry.UncompressedSize64 > uint64(maxMihomoKernelBinaryBytes) {
+		return "", "", fmt.Errorf("Mihomo 内核超过大小上限 %d 字节", maxMihomoKernelBinaryBytes)
+	}
+	entryReader, err := entry.Open()
+	if err != nil {
+		return "", "", fmt.Errorf("读取 Mihomo 发行包中的内核失败: %v", err)
+	}
+	defer func() { _ = entryReader.Close() }()
+
+	tempPath, err := persistExecutableTempFile(tempDir, "poolx-mihomo-download-", entry.Name, entryReader)
+	if err != nil {
+		return "", "", err
+	}
+	return tempPath, entry.Name, nil
+}
+
+func findMihomoExecutableInZip(files []*zip.File) (*zip.File, error) {
+	candidates := make([]*zip.File, 0, len(files))
+	for _, file := range files {
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		baseName := strings.ToLower(filepath.Base(file.Name))
+		if baseName == "mihomo" || strings.HasSuffix(baseName, ".exe") {
+			candidates = append(candidates, file)
+		}
+	}
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("Mihomo 发行包中未找到内核可执行文件")
+	}
+	if len(candidates) == 1 {
+		return candidates[0], nil
+	}
+	for _, file := range candidates {
+		baseName := strings.ToLower(filepath.Base(file.Name))
+		if baseName == "mihomo" || baseName == "mihomo.exe" || strings.HasPrefix(baseName, "mihomo") {
+			return file, nil
+		}
+	}
+	return nil, fmt.Errorf("Mihomo 发行包中包含多个可执行文件，无法确定安装目标")
 }
 
 func fetchLatestMihomoRelease(ctx context.Context) (*githubReleaseResponse, error) {
@@ -212,6 +310,10 @@ func fetchLatestMihomoRelease(ctx context.Context) (*githubReleaseResponse, erro
 }
 
 func selectMihomoReleaseAsset(assets []githubAsset) (*githubAsset, error) {
+	return selectMihomoReleaseAssetFor(assets, runtime.GOOS, runtime.GOARCH)
+}
+
+func selectMihomoReleaseAssetFor(assets []githubAsset, goos string, goarch string) (*githubAsset, error) {
 	if len(assets) == 0 {
 		return nil, fmt.Errorf("Mihomo 官方发布未包含可下载资产")
 	}
@@ -231,11 +333,11 @@ func selectMihomoReleaseAsset(assets []githubAsset) (*githubAsset, error) {
 		normalizedAssets = append(normalizedAssets, asset)
 	}
 
-	goos := strings.ToLower(runtime.GOOS)
-	for _, archCandidate := range preferredMihomoArchKeywords() {
+	normalizedGOOS := strings.ToLower(strings.TrimSpace(goos))
+	for _, archCandidate := range preferredMihomoArchKeywordsFor(goarch) {
 		for _, asset := range normalizedAssets {
 			name := strings.ToLower(strings.TrimSpace(asset.Name))
-			if !strings.Contains(name, "mihomo-") || !strings.Contains(name, goos) {
+			if !strings.Contains(name, "mihomo-") || !strings.Contains(name, normalizedGOOS) {
 				continue
 			}
 			if strings.Contains(name, archCandidate) {
@@ -245,18 +347,23 @@ func selectMihomoReleaseAsset(assets []githubAsset) (*githubAsset, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("未找到适用于当前平台 %s/%s 的 Mihomo 发行包", runtime.GOOS, runtime.GOARCH)
+	return nil, fmt.Errorf("未找到适用于当前平台 %s/%s 的 Mihomo 发行包", normalizedGOOS, strings.ToLower(strings.TrimSpace(goarch)))
 }
 
 func isSupportedMihomoBinaryAsset(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
 	if !strings.HasPrefix(name, "mihomo-") {
 		return false
 	}
-	return strings.HasSuffix(name, ".gz")
+	return strings.HasSuffix(name, ".gz") || strings.HasSuffix(name, ".zip")
 }
 
 func preferredMihomoArchKeywords() []string {
-	switch runtime.GOARCH {
+	return preferredMihomoArchKeywordsFor(runtime.GOARCH)
+}
+
+func preferredMihomoArchKeywordsFor(goarch string) []string {
+	switch strings.ToLower(strings.TrimSpace(goarch)) {
 	case "amd64":
 		return []string{"amd64-v3", "amd64-v2", "amd64-v1", "amd64-compatible", "amd64"}
 	case "arm64":
@@ -271,7 +378,7 @@ func preferredMihomoArchKeywords() []string {
 		}
 		return append(keywords, "armv7", "armv6", "arm")
 	default:
-		return []string{runtime.GOARCH}
+		return []string{strings.ToLower(strings.TrimSpace(goarch))}
 	}
 }
 
