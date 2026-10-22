@@ -111,7 +111,7 @@ var terminateMihomoProcess = terminateProcess
 var saveRuntimeInstance = func(instance *model.KernelInstance) error {
 	return model.DB.Save(instance).Error
 }
-var runtimeDataRoot = "data"
+var runtimeDataRoot = common.RuntimeDataRoot
 
 func StartRuntime(ctx context.Context) (*RuntimeStatus, error) {
 	return startRuntime(ctx, false, "start")
