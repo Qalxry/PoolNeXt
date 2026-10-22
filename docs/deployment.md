@@ -146,6 +146,115 @@ docker compose up -d
 
 默认使用命名卷，首次挂载时会继承镜像内 `/data` 的 UID/GID。若改成宿主机 bind mount，需先执行 `chown -R 10001:10001 <数据目录>`，否则非 root 进程无法创建数据库和上传目录。
 
+### 2.4 Windows 部署（实验性，NSSM 服务）
+
+Release 页面提供 `poolnext-server-windows-amd64.exe`：单文件、已内嵌管理端与 zashboard，不需要安装 Node.js。Windows 暂无 Linux 那样的一键远程安装脚本与容器镜像；仓库提供便携启动器 `scripts/poolnext-portable.cmd` 与 NSSM 服务封装脚本 `scripts/poolnext-windows-service.ps1`。
+
+前置条件：Windows 10/11 或 Windows Server 2016+；管理员 PowerShell 5.1+；[NSSM](https://nssm.cc)（把 `nssm.exe` 放进 `PATH`、脚本同目录或 `C:\nssm\nssm.exe`）。
+
+1. 下载并放置二进制：
+
+```powershell
+mkdir C:\PoolNeXt -Force
+curl.exe -L -o C:\PoolNeXt\poolnext-server-windows-amd64.exe `
+  https://github.com/Qalxry/PoolNeXt/releases/latest/download/poolnext-server-windows-amd64.exe
+```
+
+2. 在管理员 PowerShell 中注册服务（推荐）：
+
+```powershell
+.\scripts\poolnext-windows-service.ps1 install `
+  -BinaryPath C:\PoolNeXt\poolnext-server-windows-amd64.exe `
+  -InstallDir C:\PoolNeXt `
+  -NssmPath C:\nssm\nssm.exe
+```
+
+没有克隆仓库时，可单独下载脚本：
+
+```powershell
+curl.exe -L -o poolnext-windows-service.ps1 `
+  https://raw.githubusercontent.com/Qalxry/PoolNeXt/main/scripts/poolnext-windows-service.ps1
+```
+
+常用参数：`-InstallDir`（默认 `C:\PoolNeXt`）、`-ServiceName`（默认 `PoolNeXt`）、`-Port`（默认 `17778`）、`-NssmPath`、`-SessionSecret`（不传则生成并复用 `poolnext-secret`）、`-BinaryPath`（`install`/`update` 必填）、`-RemoveData`（卸载时连带删除安装目录）。
+
+脚本会生成长期 `SESSION_SECRET` 并保存为 `C:\PoolNeXt\poolnext-secret`（ACL 收紧到 Administrators/SYSTEM）、固定工作目录、把 stdout/stderr 重定向并轮转到 `C:\PoolNeXt\logs`、配置异常退出自动重启与优雅停止，最后启动服务并探测 `/api/status`。**首次启动的一次性 root 密码只打印在 `C:\PoolNeXt\logs\poolnext.stdout.log`**，脚本结束时会显示日志尾部。
+
+日常操作：
+
+```powershell
+.\scripts\poolnext-windows-service.ps1 status
+.\scripts\poolnext-windows-service.ps1 restart
+.\scripts\poolnext-windows-service.ps1 update -BinaryPath C:\Downloads\poolnext-server-windows-amd64.exe
+.\scripts\poolnext-windows-service.ps1 uninstall            # 停服务并删除服务，保留数据目录
+.\scripts\poolnext-windows-service.ps1 uninstall -RemoveData
+```
+
+3. 手工前台启动（不使用服务时）：
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$rng.Dispose()
+$env:SESSION_SECRET = -join ($bytes | ForEach-Object { $_.ToString('x2') })
+$env:SQLITE_PATH = 'C:\PoolNeXt\poolx.db'
+cd C:\PoolNeXt
+.\poolnext-server-windows-amd64.exe --port 17778
+```
+
+4. 便携目录（绿色版，可整体搬走）：
+
+```
+C:\PoolNeXt-Portable\
+  poolnext-server-windows-amd64.exe
+  poolnext-portable.cmd
+  mihomo.exe            # 首次配置内核时手动上传或官方下载
+```
+
+```powershell
+.\poolnext-portable.cmd
+```
+
+启动器会自动：生成 `poolnext-secret.txt`（64 位十六进制）、`cd` 到脚本目录、用 `--data-dir` 把数据库/上传/运行配置固定在当前目录、日志写入 `logs\`；支持用环境变量 `POOLNEXT_PORT`、`POOLNEXT_DATA_DIR` 覆盖端口与数据位置。等价的命令行：
+
+```powershell
+.\poolnext-server-windows-amd64.exe `
+  --data-dir . `
+  --session-secret-file .\poolnext-secret.txt `
+  --port 17778 --log-dir .\logs
+```
+
+注意：若内核以 managed 方式安装，数据库记录的是**绝对路径**；整个目录搬走后需在设置页重新指定/安装 `mihomo.exe`。其余节点、工作台与端口配置随数据库一起搬动。
+
+5. 手工 NSSM 配置（已有自己的服务封装时可参考）：
+
+```cmd
+nssm install PoolNeXt "C:\PoolNeXt\poolnext-server-windows-amd64.exe"
+nssm set PoolNeXt AppDirectory "C:\PoolNeXt"
+nssm set PoolNeXt AppParameters "--port 17778"
+nssm set PoolNeXt AppEnvironmentExtra "SESSION_SECRET=<至少 32 字节强随机串>" "SQLITE_PATH=C:\PoolNeXt\poolx.db" "LOG_LEVEL=info"
+nssm set PoolNeXt AppStdout "C:\PoolNeXt\logs\poolnext.stdout.log"
+nssm set PoolNeXt AppStderr "C:\PoolNeXt\logs\poolnext.stderr.log"
+nssm set PoolNeXt AppRotateFiles 1
+nssm set PoolNeXt AppRotateOnline 1
+nssm set PoolNeXt AppRotateBytes 10485760
+nssm set PoolNeXt AppExit Default Restart
+nssm set PoolNeXt AppRestartDelay 5000
+nssm set PoolNeXt AppStopMethodConsole 15000
+nssm set PoolNeXt Start SERVICE_AUTO_START
+nssm start PoolNeXt
+```
+
+Windows 注意事项：
+
+* 服务端自动升级在 Windows 上被禁用；升级用脚本 `update`（或停服务替换 exe 后启动）。页面里的“手动升级”会 `start` 一个脱离服务管理的新进程，服务模式下不要使用。
+* Mihomo 内核的“官方下载”在 Windows 上会选择官方 `.zip` 资产并自动解出 `mihomo-*.exe`；下载失败时仍可“手动上传”。
+* 默认监听 `0.0.0.0:17778`，首次运行需放行 Windows 防火墙；exe 未签名，SmartScreen 可能提示。
+* 自定义数据目录可给 exe 传 `--data-dir`（NSSM 场景放进 `AppParameters`），显式 `SQLITE_PATH`/`UPLOAD_PATH` 仍优先；便携目录见第 4 步。
+* 数据默认位于安装目录（`poolx.db`、`upload/`、`data/runtime/mihomo/`、`logs/`），备份或迁移时整目录处理。
+* 忘记 root 密码：停止服务后，在安装目录运行 `.\poolnext-server-windows-amd64.exe --reset-password`（读取当前目录的 `poolx.db`，无需 `SESSION_SECRET`）。
+
 ## 3. 首次登录
 
 访问 `http://localhost:17778`
@@ -212,6 +321,7 @@ pnpm dev
 * 当前仅开放 `mihomo`
 * “现有路径检查”会把二进制登记为 `external_immutable`，禁止覆盖、升级、删除、移动或改权
 * 手动上传和官方下载只允许写入 managed 路径，不能覆盖已登记的外部不可变文件
+* 官方下载会按当前平台挑选 Mihomo Release 资产：Linux/macOS 使用 `.gz`（直接解压出内核），Windows 使用 `.zip`（自动解出包内的 `mihomo-*.exe`）；解压后的内核同样会执行版本校验，校验失败不会落盘
 * 安装完成后会立即执行版本校验，并写回运行时配置
 
 当前文档不描述 Agent 升级、节点升级或 OpenResty 重载。

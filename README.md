@@ -153,6 +153,16 @@ Initial credentials:
 
 The password is shown only once and is never written to a file; you must change it after the first sign-in. If you lose it, stop the server and run `poolnext-server --reset-password` to reset it interactively. Production startup rejects missing, weak, or placeholder `SESSION_SECRET` values. On Linux, the install script (`scripts/poolnext-install.sh`) handles secret generation for you.
 
+### Windows (experimental)
+
+Every release also ships `poolnext-server-windows-amd64.exe`. Register it as a Windows service with the PowerShell helper (requires [NSSM](https://nssm.cc)):
+
+```powershell
+.\scripts\poolnext-windows-service.ps1 install -BinaryPath C:\PoolNeXt\poolnext-server-windows-amd64.exe -InstallDir C:\PoolNeXt
+```
+
+For a self-contained folder, `scripts\poolnext-portable.cmd` starts the server from the exe directory, generates `poolnext-secret.txt` on first run, and keeps the database, uploads and runtime config there (see `--data-dir`). The service helper generates and persists `SESSION_SECRET`, writes rotated logs to `C:\PoolNeXt\logs`, restarts the service on failure, and probes `/api/status` after start. Windows deployment is experimental: there is no one-command remote installer or Windows container image, and in-app server self-update is disabled; use `status`/`update` from the helper instead. Manual startup and raw NSSM commands are documented in [docs/deployment.md](./docs/deployment.md) section 2.4.
+
 
 ## Configuration
 

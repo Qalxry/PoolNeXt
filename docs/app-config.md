@@ -31,6 +31,8 @@ SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -bui
 | 参数 | 作用 | 默认值 |
 | --- | --- | --- |
 | `--port` | 指定 Server 监听端口 | `17778` |
+| `--data-dir` | 数据根目录；派生 `<dir>/poolx.db`、`<dir>/upload`、`<dir>/data/runtime`，显式 `SQLITE_PATH`/`UPLOAD_PATH` 仍优先 | 空（相对当前工作目录） |
+| `--session-secret-file` | 从文件读取 `SESSION_SECRET`；环境变量 `SESSION_SECRET` 优先级更高 | 空 |
 | `--log-dir` | 指定日志目录 | 空 |
 | `--version` | 输出当前版本后退出 | `false` |
 | `--reset-password` | 交互式重置管理员密码后退出（不启动服务） | `false` |
@@ -44,6 +46,7 @@ SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -bui
 | `GIN_MODE` | Gin 运行模式 | 非 `debug` 时按 release |
 | `LOG_LEVEL` | 日志等级 | `info` |
 | `SESSION_SECRET` | Session 签名密钥；生产模式至少 32 字节且不能是占位值 | 无，生产必填 |
+| `SESSION_SECRET_FILE` | 从文件读取 `SESSION_SECRET`（内容去首尾空白）；`SESSION_SECRET` 优先 | 空 |
 | `SESSION_COOKIE_SECURE` | 强制 Session Cookie 使用 Secure | TLS 请求自动启用，否则 `false` |
 | `TRUSTED_PROXIES` | 可信反向代理 IP/CIDR，逗号分隔 | 空，不信任转发头 |
 | `MAX_REQUEST_BODY_BYTES` | 普通请求体上限 | `8388608` |
@@ -57,6 +60,8 @@ SESSION_SECRET="$(openssl rand -hex 32)" go run -tags embedassets -trimpath -bui
 说明：
 
 * `SESSION_SECRET` 在生产环境必须显式配置；仅测试二进制，或同时设置 `GIN_MODE=debug` 与 `POOLNEXT_ALLOW_EPHEMERAL_SESSION_SECRET=true` 时，才允许临时 secret
+* `--session-secret-file` 与 `SESSION_SECRET_FILE` 二选一即可；文件内容会去掉首尾空白，空文件或不可读文件会直接拒绝启动；`SESSION_SECRET` 环境变量优先级最高
+* `--data-dir` 只填充默认路径：`SQLITE_PATH`、`UPLOAD_PATH` 环境变量仍然优先；运行配置目录固定为 `<data-dir>/data/runtime/<kernel>`。便携目录可直接使用 `scripts/poolnext-portable.cmd`，详见 [deployment.md](./deployment.md) 2.4
 * 首次启动会在 stdout 打印一次随机生成的 root 一次性密码，不会写入任何文件；首次登录后强制要求修改密码
 * 忘记密码时，运行 `poolnext-server --reset-password` 交互式重置管理员密码（不启动服务，不暴露网络）
 * `REDIS_CONN_STRING` 未配置时，相关能力退化为进程内实现

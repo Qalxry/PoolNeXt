@@ -143,6 +143,16 @@ SQLITE_PATH=/path/to/poolx.db \
 
 密码只显示这一次，不会写入任何文件；首次登录后强制要求修改密码。若遗忘密码，停止服务后运行 `poolnext-server --reset-password` 交互式重置。生产模式会拒绝缺失、弱值或占位值 `SESSION_SECRET`。Linux 下一键安装脚本（`scripts/poolnext-install.sh`）会自动处理密钥生成。
 
+### Windows（实验性）
+
+每个 Release 同时提供 `poolnext-server-windows-amd64.exe`。用 PowerShell 脚本把它注册为 Windows 服务（需要 [NSSM](https://nssm.cc)）：
+
+```powershell
+.\scripts\poolnext-windows-service.ps1 install -BinaryPath C:\PoolNeXt\poolnext-server-windows-amd64.exe -InstallDir C:\PoolNeXt
+```
+
+想要绿色便携目录时，直接运行 `scripts\poolnext-portable.cmd`：它会在 exe 所在目录生成 `poolnext-secret.txt`，并通过 `--data-dir` 把数据库、上传与运行配置都固定在该目录。服务脚本则会生成并持久化 `SESSION_SECRET`、把日志轮转到 `C:\PoolNeXt\logs`、异常退出自动重启，并在启动后探测 `/api/status`。Windows 部署目前是实验性的：没有 Linux 那样的一键远程安装脚本与 Windows 容器镜像，服务端自动升级也被禁用；请使用脚本的 `status`/`update` 子命令。手工启动与原生 NSSM 配置见 [docs/deployment.md](./docs/deployment.md) 2.4 节。
+
 
 ## 配置说明
 
