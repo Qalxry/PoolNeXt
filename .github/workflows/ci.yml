@@ -612,6 +612,12 @@ jobs:
 
       # Required regression: installs a real NSSM-managed service, updates its
       # binary and removes the service at the end.
+      - name: Restore cached NSSM archive
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: ${{ runner.temp }}/nssm-2.24.zip
+          key: nssm-2.24-727d1e42275c605e0f04aba98095c38a8e1e46def453cdffce42869428aa6743
+
       - name: Exercise NSSM service helper end to end
         shell: pwsh
         env:
@@ -620,28 +626,41 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $nssmZip = Join-Path $env:RUNNER_TEMP 'nssm-2.24.zip'
           $expectedHash = '727d1e42275c605e0f04aba98095c38a8e1e46def453cdffce42869428aa6743'
-          $nssmUrls = @(
-            'https://nssm.cc/release/nssm-2.24.zip',
-            'https://web.archive.org/web/2024id_/https://nssm.cc/release/nssm-2.24.zip'
-          )
           $downloaded = $false
-          foreach ($nssmUrl in $nssmUrls) {
-            for ($attempt = 1; $attempt -le 3; $attempt++) {
-              try {
-                Write-Host "Downloading NSSM from $nssmUrl (attempt $attempt)..."
-                Invoke-WebRequest -Uri $nssmUrl -OutFile $nssmZip -UseBasicParsing -TimeoutSec 90
-                $actualHash = (Get-FileHash -LiteralPath $nssmZip -Algorithm SHA256).Hash.ToLowerInvariant()
-                if ($actualHash -eq $expectedHash) {
-                  $downloaded = $true
-                  break
-                }
-                Write-Host "Unexpected NSSM archive hash from $nssmUrl : $actualHash"
-              } catch {
-                Write-Host "NSSM download failed from $nssmUrl (attempt $attempt): $($_.Exception.Message)"
-                Start-Sleep -Seconds (5 * $attempt)
-              }
+          if (Test-Path -LiteralPath $nssmZip) {
+            $cachedHash = (Get-FileHash -LiteralPath $nssmZip -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($cachedHash -eq $expectedHash) {
+              Write-Host 'Using cached, SHA256-verified NSSM archive.'
+              $downloaded = $true
+            } else {
+              Write-Host "Discarding cached NSSM archive with unexpected hash: $cachedHash"
+              Remove-Item -LiteralPath $nssmZip -Force
             }
-            if ($downloaded) { break }
+          }
+          if (-not $downloaded) {
+            $nssmUrls = @(
+              'https://nssm.cc/release/nssm-2.24.zip',
+              'https://web.archive.org/web/2024id_/https://nssm.cc/release/nssm-2.24.zip',
+              'https://web.archive.org/web/2023id_/https://nssm.cc/release/nssm-2.24.zip'
+            )
+            foreach ($nssmUrl in $nssmUrls) {
+              for ($attempt = 1; $attempt -le 3; $attempt++) {
+                try {
+                  Write-Host "Downloading NSSM from $nssmUrl (attempt $attempt)..."
+                  Invoke-WebRequest -Uri $nssmUrl -OutFile $nssmZip -UseBasicParsing -TimeoutSec 90
+                  $actualHash = (Get-FileHash -LiteralPath $nssmZip -Algorithm SHA256).Hash.ToLowerInvariant()
+                  if ($actualHash -eq $expectedHash) {
+                    $downloaded = $true
+                    break
+                  }
+                  Write-Host "Unexpected NSSM archive hash from $nssmUrl : $actualHash"
+                } catch {
+                  Write-Host "NSSM download failed from $nssmUrl (attempt $attempt): $($_.Exception.Message)"
+                  Start-Sleep -Seconds (5 * $attempt)
+                }
+              }
+              if ($downloaded) { break }
+            }
           }
           if (-not $downloaded) {
             throw 'Unable to download a SHA256-verified NSSM 2.24 archive from any configured source.'
