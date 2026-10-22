@@ -356,6 +356,335 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  windows-smoke:
+    name: Windows build and startup smoke
+    needs: [metadata, web, zashboard]
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Download WebUI build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: quality-web-build
+          path: server/web/build
+
+      - name: Download Zashboard build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: quality-zashboard-build
+          path: server/zashboard/dist
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - name: Compile Go test binaries for Windows
+        working-directory: server
+        shell: bash
+        run: go test -run '^$' ./...
+
+      - name: Run portable kernel asset tests on Windows
+        working-directory: server
+        shell: bash
+        run: |
+          go test -count=1 \
+            -run '^Test(IsSupportedMihomoBinaryAsset|SelectMihomoReleaseAsset|PrepareMihomoReleaseBinary)' \
+            ./internal/service
+
+      - name: Build embedded Windows binary
+        working-directory: server
+        shell: bash
+        env:
+          BUILD_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../dist
+          go build -tags embedassets -trimpath -buildvcs=false \
+            -ldflags "-s -w -X poolx/internal/pkg/common.Version=${BUILD_VERSION}" \
+            -o ../dist/poolnext-server-windows-amd64.exe .
+
+      - name: Verify embedded binary version
+        working-directory: server
+        shell: bash
+        env:
+          BUILD_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          actual="$(../dist/poolnext-server-windows-amd64.exe --version)"
+          actual="${actual%$'\r'}"
+          echo "reported version: ${actual}"
+          test "${actual}" = "${BUILD_VERSION}"
+
+      - name: Start binary and probe embedded WebUI
+        shell: pwsh
+        env:
+          BUILD_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'dist\poolnext-server-windows-amd64.exe'
+          $dataDir = Join-Path $env:RUNNER_TEMP 'poolnext-windows-smoke'
+          New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+          $stdoutPath = Join-Path $dataDir 'server-stdout.log'
+          $stderrPath = Join-Path $dataDir 'server-stderr.log'
+          $portProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+          $portProbe.Start()
+          $port = $portProbe.LocalEndpoint.Port
+          $portProbe.Stop()
+          $baseUrl = "http://127.0.0.1:$port"
+
+          $randomPart = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 40 | ForEach-Object { [char]$_ })
+          $env:SESSION_SECRET = "WindowsSmoke-$randomPart-0001"
+          $env:SQLITE_PATH = Join-Path $dataDir 'poolx.db'
+          $env:LOG_LEVEL = 'info'
+
+          $server = Start-Process -FilePath $exe `
+            -ArgumentList @('--port', "$port") `
+            -WorkingDirectory $dataDir `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath `
+            -WindowStyle Hidden `
+            -PassThru
+          try {
+            $deadline = (Get-Date).AddSeconds(90)
+            $index = $null
+            while ((Get-Date) -lt $deadline) {
+              if ($server.HasExited) {
+                throw "server exited early with code $($server.ExitCode)"
+              }
+              try {
+                $index = Invoke-WebRequest -Uri "$baseUrl/" -UseBasicParsing -TimeoutSec 3
+                if ($index.StatusCode -eq 200) { break }
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+            if ($null -eq $index -or $index.StatusCode -ne 200) {
+              throw 'embedded WebUI did not become available on /'
+            }
+            if ($index.Content -notmatch 'PoolNeXt') {
+              throw 'embedded WebUI response does not look like the PoolNeXt console'
+            }
+
+            $status = Invoke-RestMethod -Uri "$baseUrl/api/status" -TimeoutSec 15
+            if (-not $status.success) {
+              throw 'status API returned success=false'
+            }
+            if ($status.data.version -ne $env:BUILD_VERSION) {
+              throw "status API version '$($status.data.version)' does not match expected '$env:BUILD_VERSION'"
+            }
+
+            if (-not (Test-Path $env:SQLITE_PATH)) {
+              throw "SQLite database was not created at $env:SQLITE_PATH"
+            }
+            if ((Get-Item $env:SQLITE_PATH).Length -le 0) {
+              throw 'SQLite database file is empty'
+            }
+
+            $logText = Get-Content -Path $stdoutPath -Raw -Encoding utf8
+            if ($logText -notmatch '一次性密码') {
+              throw 'first-run bootstrap credentials were not printed to stdout'
+            }
+            Write-Host 'Windows startup smoke passed: embedded WebUI, status API, SQLite bootstrap and one-time password all verified.'
+          } catch {
+            Write-Host '--- server stdout (tail) ---'
+            if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Tail 200 }
+            Write-Host '--- server stderr (tail) ---'
+            if (Test-Path $stderrPath) { Get-Content $stderrPath -Tail 200 }
+            throw
+          } finally {
+            if ($null -ne $server) {
+              try {
+                if (-not $server.HasExited) {
+                  Stop-Process -Id $server.Id -Force
+                }
+              } catch {
+                Write-Host "server cleanup skipped: $_"
+              }
+            }
+          }
+
+      - name: Verify portable launcher and data-dir flags
+        shell: pwsh
+        env:
+          BUILD_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $portableDir = Join-Path $env:RUNNER_TEMP 'poolnext-portable'
+          $workingDir = Join-Path $env:RUNNER_TEMP 'poolnext-portable-cwd'
+          New-Item -ItemType Directory -Force -Path $portableDir, $workingDir | Out-Null
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'dist\poolnext-server-windows-amd64.exe') -Destination (Join-Path $portableDir 'poolnext-server-windows-amd64.exe') -Force
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'scripts\poolnext-portable.cmd') -Destination (Join-Path $portableDir 'poolnext-portable.cmd') -Force
+
+          $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+          $listener.Start()
+          $port = $listener.LocalEndpoint.Port
+          $listener.Stop()
+          $env:POOLNEXT_PORT = "$port"
+
+          $stdoutPath = Join-Path $env:RUNNER_TEMP 'portable-stdout.log'
+          $stderrPath = Join-Path $env:RUNNER_TEMP 'portable-stderr.log'
+          $launcher = Join-Path $portableDir 'poolnext-portable.cmd'
+          $process = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', "`"$launcher`"") -WorkingDirectory $workingDir -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+          try {
+            $deadline = (Get-Date).AddSeconds(120)
+            $status = $null
+            while ((Get-Date) -lt $deadline) {
+              if ($process.HasExited) {
+                throw "Portable launcher exited early with code $($process.ExitCode)"
+              }
+              try {
+                $status = Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/status" -TimeoutSec 3
+                if ($status.success) { break }
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+            if ($null -eq $status -or -not $status.success) {
+              throw 'Portable launcher did not start the server'
+            }
+            if ($status.data.version -ne $env:BUILD_VERSION) {
+              throw "Portable launcher API version '$($status.data.version)' does not match expected '$env:BUILD_VERSION'."
+            }
+
+            $secretPath = Join-Path $portableDir 'poolnext-secret.txt'
+            if (-not (Test-Path -LiteralPath $secretPath)) {
+              throw 'Portable launcher did not create the SESSION_SECRET file.'
+            }
+            $secret = (Get-Content -LiteralPath $secretPath -Raw -Encoding ascii).Trim()
+            if ($secret -notmatch '^[0-9a-f]{64}$') {
+              throw 'Portable launcher created a SESSION_SECRET with an unexpected format.'
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $portableDir 'poolx.db'))) {
+              throw '--data-dir did not place the SQLite database under the portable folder.'
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $portableDir 'upload'))) {
+              throw '--data-dir did not place the upload directory under the portable folder.'
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $portableDir 'logs'))) {
+              throw 'Portable launcher did not create the logs directory.'
+            }
+            if ((Get-ChildItem -LiteralPath $workingDir -Force | Measure-Object).Count -ne 0) {
+              throw 'Portable launcher wrote files into the working directory instead of the portable folder.'
+            }
+            Write-Host 'Portable launcher check passed: data-dir isolation, secret generation and API startup verified.'
+          } catch {
+            Write-Host '--- portable launcher stdout (tail) ---'
+            if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Tail 100 }
+            Write-Host '--- portable launcher stderr (tail) ---'
+            if (Test-Path $stderrPath) { Get-Content $stderrPath -Tail 100 }
+            throw
+          } finally {
+            try {
+              taskkill /PID $process.Id /T /F 2>&1 | Out-Null
+            } catch {
+              Write-Host "portable launcher cleanup warning: $_"
+            }
+            if (Test-Path -LiteralPath $portableDir) { Remove-Item -LiteralPath $portableDir -Recurse -Force -ErrorAction SilentlyContinue }
+            if (Test-Path -LiteralPath $workingDir) { Remove-Item -LiteralPath $workingDir -Recurse -Force -ErrorAction SilentlyContinue }
+          }
+
+      - name: Validate Windows service helper syntax
+        shell: pwsh
+        run: |
+          $helper = Join-Path $env:GITHUB_WORKSPACE 'scripts\poolnext-windows-service.ps1'
+          if (-not (Test-Path -LiteralPath $helper)) {
+            throw "Windows service helper is missing: $helper"
+          }
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile($helper, [ref]$tokens, [ref]$errors)
+          if ($errors -and $errors.Count -gt 0) {
+            $errors | ForEach-Object {
+              Write-Host ("line {0}, column {1}: {2}" -f $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message)
+            }
+            throw "PowerShell parser reported $($errors.Count) error(s) in the Windows service helper."
+          }
+          Write-Host "Windows service helper syntax is valid ($($tokens.Count) tokens)."
+
+      # Non-blocking until the NSSM harness has proven stable across runner images;
+      # promote to a required step once it is consistently green.
+      - name: Exercise NSSM service helper end to end
+        shell: pwsh
+        continue-on-error: true
+        env:
+          BUILD_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $nssmZip = Join-Path $env:RUNNER_TEMP 'nssm-2.24.zip'
+          Invoke-WebRequest -Uri 'https://nssm.cc/release/nssm-2.24.zip' -OutFile $nssmZip -UseBasicParsing
+          $expectedHash = '727d1e42275c605e0f04aba98095c38a8e1e46def453cdffce42869428aa6743'
+          $actualHash = (Get-FileHash -LiteralPath $nssmZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $expectedHash) {
+            throw "Unexpected NSSM archive hash: $actualHash"
+          }
+          Expand-Archive -LiteralPath $nssmZip -DestinationPath $env:RUNNER_TEMP -Force
+          $nssm = Join-Path $env:RUNNER_TEMP 'nssm-2.24\win64\nssm.exe'
+          if (-not (Test-Path -LiteralPath $nssm)) {
+            throw "nssm.exe was not extracted from the archive"
+          }
+
+          $helper = Join-Path $env:GITHUB_WORKSPACE 'scripts\poolnext-windows-service.ps1'
+          $binary = Join-Path $env:GITHUB_WORKSPACE 'dist\poolnext-server-windows-amd64.exe'
+          $installDir = Join-Path $env:RUNNER_TEMP 'poolnext-service-smoke'
+          $serviceName = 'PoolNeXtCITest'
+
+          $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+          $listener.Start()
+          $port = $listener.LocalEndpoint.Port
+          $listener.Stop()
+
+          try {
+            & $helper install -InstallDir $installDir -ServiceName $serviceName -Port $port -NssmPath $nssm -BinaryPath $binary
+            & $helper status -InstallDir $installDir -ServiceName $serviceName -Port $port
+
+            $service = Get-Service -Name $serviceName
+            if ($service.Status -ne 'Running') {
+              throw "Service state is '$($service.Status)' after install; expected Running."
+            }
+            $response = Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/status" -TimeoutSec 10
+            if ($response.data.version -ne $env:BUILD_VERSION) {
+              throw "Service API version '$($response.data.version)' does not match expected '$env:BUILD_VERSION'."
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $installDir 'poolx.db'))) {
+              throw "Service did not create its SQLite database under $installDir."
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $installDir 'poolnext-secret'))) {
+              throw "Service helper did not persist the SESSION_SECRET file."
+            }
+
+            $updatedBinary = Join-Path $env:RUNNER_TEMP 'poolnext-server-update.exe'
+            Copy-Item -LiteralPath $binary -Destination $updatedBinary -Force
+            & $helper update -InstallDir $installDir -ServiceName $serviceName -Port $port -NssmPath $nssm -BinaryPath $updatedBinary
+            $service = Get-Service -Name $serviceName
+            if ($service.Status -ne 'Running') {
+              throw "Service state is '$($service.Status)' after update; expected Running."
+            }
+            Write-Host 'NSSM service helper end-to-end check passed.'
+          } finally {
+            try {
+              if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+                & $helper uninstall -InstallDir $installDir -ServiceName $serviceName -RemoveData
+              }
+            } catch {
+              Write-Host "service uninstall cleanup warning: $_"
+            }
+            if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+              & $nssm remove $serviceName confirm 2>&1 | Write-Host
+            }
+            if (Test-Path -LiteralPath $installDir) {
+              Remove-Item -LiteralPath $installDir -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+
   reproducible-build:
     name: Reproducible production build
     needs: metadata
