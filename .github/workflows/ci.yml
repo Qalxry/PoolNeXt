@@ -620,11 +620,32 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $nssmZip = Join-Path $env:RUNNER_TEMP 'nssm-2.24.zip'
-          Invoke-WebRequest -Uri 'https://nssm.cc/release/nssm-2.24.zip' -OutFile $nssmZip -UseBasicParsing
           $expectedHash = '727d1e42275c605e0f04aba98095c38a8e1e46def453cdffce42869428aa6743'
-          $actualHash = (Get-FileHash -LiteralPath $nssmZip -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actualHash -ne $expectedHash) {
-            throw "Unexpected NSSM archive hash: $actualHash"
+          $nssmUrls = @(
+            'https://nssm.cc/release/nssm-2.24.zip',
+            'https://web.archive.org/web/2024id_/https://nssm.cc/release/nssm-2.24.zip'
+          )
+          $downloaded = $false
+          foreach ($nssmUrl in $nssmUrls) {
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try {
+                Write-Host "Downloading NSSM from $nssmUrl (attempt $attempt)..."
+                Invoke-WebRequest -Uri $nssmUrl -OutFile $nssmZip -UseBasicParsing -TimeoutSec 90
+                $actualHash = (Get-FileHash -LiteralPath $nssmZip -Algorithm SHA256).Hash.ToLowerInvariant()
+                if ($actualHash -eq $expectedHash) {
+                  $downloaded = $true
+                  break
+                }
+                Write-Host "Unexpected NSSM archive hash from $nssmUrl : $actualHash"
+              } catch {
+                Write-Host "NSSM download failed from $nssmUrl (attempt $attempt): $($_.Exception.Message)"
+                Start-Sleep -Seconds (5 * $attempt)
+              }
+            }
+            if ($downloaded) { break }
+          }
+          if (-not $downloaded) {
+            throw 'Unable to download a SHA256-verified NSSM 2.24 archive from any configured source.'
           }
           Expand-Archive -LiteralPath $nssmZip -DestinationPath $env:RUNNER_TEMP -Force
           $nssm = Join-Path $env:RUNNER_TEMP 'nssm-2.24\win64\nssm.exe'
@@ -669,6 +690,7 @@ jobs:
               throw "Service state is '$($service.Status)' after update; expected Running."
             }
             Write-Host 'NSSM service helper end-to-end check passed.'
+            Write-Host "NSSM-E2E-OK-$($env:GITHUB_RUN_ID)-$($env:GITHUB_JOB)"
           } finally {
             try {
               if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
