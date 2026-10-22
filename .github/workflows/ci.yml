@@ -610,11 +610,10 @@ jobs:
           }
           Write-Host "Windows service helper syntax is valid ($($tokens.Count) tokens)."
 
-      # Non-blocking until the NSSM harness has proven stable across runner images;
-      # promote to a required step once it is consistently green.
+      # Required regression: installs a real NSSM-managed service, updates its
+      # binary and removes the service at the end.
       - name: Exercise NSSM service helper end to end
         shell: pwsh
-        continue-on-error: true
         env:
           BUILD_VERSION: ${{ needs.metadata.outputs.version }}
         run: |
